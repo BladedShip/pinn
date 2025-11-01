@@ -6,6 +6,7 @@ export interface FlowNode {
     label: string;
     color?: string;
     tags?: string[];
+    completed?: boolean;
   };
 }
 

@@ -13,9 +13,10 @@ import {
   Connection,
   Handle,
   Position,
+  NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { FileText, X, Search, Trash2, Tag, Palette, Edit2, Clock, PlusCircle, Calendar, ChevronLeft, Check, HelpCircle, GitBranch, AlertCircle } from 'lucide-react';
+import { FileText, X, Search, Trash2, Tag, Palette, Edit2, Clock, PlusCircle, Calendar, ChevronLeft, Check, HelpCircle, GitBranch, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getFlowById, saveFlow, createFlow as createFlowStorage, Flow, FlowNode, FlowEdge, removeNodeFromFlow } from '../lib/flowStorage';
 import { getNotes, getNoteById, saveNote, createNote, Note } from '../lib/storage';
 import WYSIWYGEditor from './WYSIWYGEditor';
@@ -33,6 +34,7 @@ interface CustomNodeData extends Record<string, unknown> {
   tags?: string[];
   noteId: string;
   isDeleted?: boolean;
+  completed?: boolean;
 }
 
 const nodeColors = [
@@ -58,31 +60,60 @@ const edgeColors = [
 ];
 
 // Custom Node Component
-function CustomNode({ data }: { data: CustomNodeData }) {
+function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
+  const isCompleted = data.completed === true;
+  
   return (
     <div
       className="relative"
       style={{
         background: data.isDeleted ? '#6B7280' : (data.color || '#6366F1'),
         color: '#fff',
-        border: data.isDeleted ? '2px dashed #EF4444' : '1px solid #3a4450',
-        borderRadius: '8px',
-        padding: '10px',
+        border: data.isDeleted ? '2px dashed #EF4444' : (isCompleted ? '2px solid #10B981' : '1px solid #3a4450'),
+        borderRadius: '6px',
+        padding: '12px',
         width: '200px',
-        opacity: data.isDeleted ? 0.6 : 1,
+        opacity: data.isDeleted ? 0.6 : (isCompleted ? 0.75 : 1),
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
+      data-node-checkbox-id={id}
     >
       <Handle type="target" position={Position.Top} />
-      <div className={`flex gap-2 ${data.isDeleted ? 'flex-col items-center justify-center' : 'items-start'}`}>
-        <div className={`${data.isDeleted ? 'text-center' : 'flex-1 min-w-0'}`}>
-          <div className={`text-sm font-medium ${data.isDeleted ? '' : 'truncate'}`}>{data.label}</div>
-          {data.isDeleted && (
-            <div className="flex items-center justify-center gap-1 mt-1 text-xs text-red-300">
-              <AlertCircle className="w-3 h-3 flex-shrink-0" />
-              <span>Note deleted</span>
-            </div>
-          )}
+      <div className={`flex gap-2.5 ${data.isDeleted ? 'flex-col items-center justify-center' : 'items-center'}`}>
+        {/* Checkbox button */}
+        {!data.isDeleted && (
+          <div
+            data-node-checkbox="true"
+            className="flex-shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+            title={isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
+          >
+            {isCompleted ? (
+              <CheckCircle2 className="w-4 h-4 text-green-300" strokeWidth={2.5} fill="currentColor" />
+            ) : (
+              <div className="w-4 h-4 border-2 border-white/60 rounded-full hover:border-white transition-colors" />
+            )}
+          </div>
+        )}
+        <div className={`${data.isDeleted ? 'text-center' : 'flex-1 min-w-0'} flex items-center`}>
+          <div 
+            className={`${data.isDeleted ? '' : 'truncate'} ${isCompleted ? 'line-through opacity-80' : ''}`}
+            style={{
+              fontSize: '13px',
+              fontWeight: '400',
+              lineHeight: '1.4',
+              letterSpacing: '-0.01em',
+              color: '#ffffff',
+            }}
+          >
+            {data.label}
+          </div>
         </div>
+        {data.isDeleted && (
+          <div className="flex items-center justify-center gap-1 mt-1 text-xs text-red-300" style={{ fontSize: '11px', fontWeight: '400' }}>
+            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+            <span>Note deleted</span>
+          </div>
+        )}
       </div>
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -192,6 +223,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
               label: node.data.label,
               color: node.data.color,
               tags: node.data.tags || [],
+              completed: node.data.completed || false,
             },
           })),
         };
@@ -248,6 +280,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
             tags: node.data.tags || [],
             noteId: node.noteId,
             isDeleted,
+            completed: node.data.completed || false,
           },
           type: 'default',
           selected: false,
@@ -279,6 +312,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
               label: node.data.label,
               color: node.data.color,
               tags: node.data.tags || [],
+              completed: node.data.completed || false,
             },
           })),
         };
@@ -299,6 +333,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
         label: node.data.label,
         color: node.data.color,
         tags: node.data.tags || [],
+        completed: node.data.completed || false,
       },
     }));
 
@@ -476,6 +511,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
         tags: [],
         noteId: note.id,
         isDeleted: false,
+        completed: false,
       },
       type: 'default',
     };
@@ -549,6 +585,17 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
   };
 
   const handleNodeClick = (event: React.MouseEvent, node: Node<CustomNodeData>) => {
+    // Check if click was on the checkbox
+    const target = event.target as HTMLElement;
+    const isCheckboxClick = target.closest('[data-node-checkbox="true"]') !== null;
+    
+    if (isCheckboxClick) {
+      // Toggle completed status instead of selecting
+      event.stopPropagation();
+      handleToggleCompleted(node.id);
+      return;
+    }
+
     // Clear edge selection when selecting nodes
     setSelectedEdges([]);
     setShowEdgeOptions(null);
@@ -641,6 +688,48 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
     );
   };
 
+  const handleToggleCompleted = (nodeId: string) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              completed: !node.data.completed,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  };
+
+  const handleToggleSelectedNodesCompleted = () => {
+    // Check if all selected nodes are completed
+    const allCompleted = selectedNodes.every((nodeId) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      return node?.data.completed === true;
+    });
+
+    // Toggle all to the opposite state
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (selectedNodes.includes(node.id)) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              completed: !allCompleted,
+            },
+          };
+        }
+        return node;
+      })
+    );
+    setSelectedNodes([]);
+  };
+
   const handleSaveTitle = () => {
     setEditingTitle(false);
     if (flow && flowTitle.trim()) {
@@ -725,6 +814,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
           label: node.data.label,
           color: node.data.color,
           tags: node.data.tags || [],
+          completed: node.data.completed || false,
         },
       }));
 
@@ -1024,6 +1114,29 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                       })}
                     </div>
                   </div>
+
+                  {/* Completed Toggle */}
+                  {(() => {
+                    const allCompleted = selectedNodes.every((nodeId) => {
+                      const node = nodes.find((n) => n.id === nodeId);
+                      return node?.data.completed === true;
+                    });
+                    return (
+                      <div>
+                        <button
+                          onClick={handleToggleSelectedNodesCompleted}
+                          className={`w-full px-2 py-1.5 rounded text-xs transition-all flex items-center justify-center gap-1.5 ${
+                            allCompleted
+                              ? 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 hover:border-green-500/50 text-green-400/80 hover:text-green-400'
+                              : 'bg-[#3a4450]/50 hover:bg-[#3a4450] border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-white'
+                          }`}
+                        >
+                          <CheckCircle2 className={`w-3 h-3 ${allCompleted ? '' : 'opacity-50'}`} />
+                          {allCompleted ? 'Mark Incomplete' : 'Mark Completed'}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Delete Button */}
                   <button
@@ -1357,6 +1470,21 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                       <PlusCircle className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
+
+                {/* Completed Toggle */}
+                <div className="pt-2 border-t border-gray-700/50">
+                  <button
+                    onClick={() => handleToggleCompleted(showNodeOptions.id)}
+                    className={`w-full px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      showNodeOptions.data.completed
+                        ? 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 hover:border-green-500/50 text-green-400 hover:text-green-300'
+                        : 'bg-[#3a4450]/50 hover:bg-[#3a4450] border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    <CheckCircle2 className={`w-4 h-4 ${showNodeOptions.data.completed ? '' : 'opacity-50'}`} />
+                    {showNodeOptions.data.completed ? 'Completed' : 'Mark as Completed'}
+                  </button>
                 </div>
 
                 {/* Delete Button */}
