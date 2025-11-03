@@ -286,7 +286,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
                     
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                        <label className="flex text-sm font-medium text-gray-300 mb-2 items-center gap-2">
                           <Key className="w-4 h-4" />
                           Gemini API Key
                         </label>
