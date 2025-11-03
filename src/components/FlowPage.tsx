@@ -152,6 +152,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
   const edgeOptionsRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef(nodes);
   const flowRef = useRef(flow);
+  const hasCreatedRef = useRef(false);
 
   // Keep refs updated
   useEffect(() => {
@@ -166,7 +167,9 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
     if (flowId) {
       loadFlow(flowId);
     } else {
-      // Create a new flow if none exists
+      // Prevent double-creation in React StrictMode/dev
+      if (hasCreatedRef.current) return;
+      hasCreatedRef.current = true;
       const newFlow = createFlowStorage('Untitled Flow');
       setFlow(newFlow);
       setFlowTitle('Untitled Flow');
@@ -174,6 +177,15 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
       setEdges([]);
     }
   }, [flowId]);
+
+  // Persist pending title edits when navigating away/unmounting
+  useEffect(() => {
+    return () => {
+      if (flow && flowTitle.trim() && flow.title !== flowTitle.trim()) {
+        saveFlow({ ...flow, title: flowTitle.trim() });
+      }
+    };
+  }, [flow, flowTitle]);
 
   // Sync node titles when the page becomes visible or receives focus (e.g., after editing notes)
   useEffect(() => {
@@ -838,7 +850,12 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
       <header className="sticky top-0 z-50 bg-[#2c3440] flex items-center justify-between px-6 py-4 border-b border-gray-700">
         <div className="flex items-center gap-4">
           <button
-            onClick={onNavigateToFlows}
+            onClick={() => {
+              if (editingTitle) {
+                handleSaveTitle();
+              }
+              onNavigateToFlows();
+            }}
             className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
             title="Back to Flows"
           >
@@ -873,7 +890,12 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
         </div>
         <div className="flex items-center gap-4">
           <button
-            onClick={onNavigateToFlows}
+            onClick={() => {
+              if (editingTitle) {
+                handleSaveTitle();
+              }
+              onNavigateToFlows();
+            }}
             className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
           >
             <GitBranch className="w-5 h-5" />

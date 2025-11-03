@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Menu as MenuIcon, Download, Upload, Trash2, ChevronLeft, GitBranch, Settings } from 'lucide-react';
-import { getNotes, Note, deleteNote, writeAll } from '../lib/storage';
+import { Search, Plus, Menu as MenuIcon, Download, Upload, Trash2, ChevronLeft, GitBranch, Settings, Folder, FolderOpen, ChevronRight, ChevronDown, Edit2, Book } from 'lucide-react';
+import { getNotes, Note, deleteNote, writeAll, getAllFolders, setNoteFolder, addFolder, renameFolder as storageRenameFolder, deleteFolder as storageDeleteFolder } from '../lib/storage';
 import { getFlowsContainingNote } from '../lib/flowStorage';
 import ConfirmDialog from './ConfirmDialog';
 import Toast from './Toast';
@@ -18,13 +18,23 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'title' | 'date'>('date');
+  const [folders, setFolders] = useState<string[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>('All');
+  const [showFolderDialog, setShowFolderDialog] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [assignAfterCreateNoteId, setAssignAfterCreateNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
   const [flowsUsingNote, setFlowsUsingNote] = useState<Array<{ flowId: string; flowTitle: string }>>([]);
+  const [folderToRename, setFolderToRename] = useState<string | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [folderDeleteCount, setFolderDeleteCount] = useState<number>(0);
+  const [showFolderDeleteDialog, setShowFolderDeleteDialog] = useState(false);
   const [toast, setToast] = useState<{ isOpen: boolean; message: string; type: 'success' | 'error' }>({
     isOpen: false,
     message: '',
@@ -38,7 +48,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   useEffect(() => {
     filterAndSortNotes();
-  }, [notes, searchQuery, sortBy]);
+  }, [notes, searchQuery, sortBy, selectedFolder]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -60,11 +70,63 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
     try {
       const data = getNotes();
       setNotes(data || []);
+      const allFolders = getAllFolders();
+      setFolders(['All', 'Unfiled', ...allFolders]);
+      // Auto-expand folders that have notes in the current filter
+      if (allFolders.length > 0 && expandedFolders.size === 0) {
+        setExpandedFolders(new Set(allFolders));
+      }
     } catch (error) {
       console.error('Error loading notes:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleFolder = (folderName: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderName)) {
+        next.delete(folderName);
+      } else {
+        next.add(folderName);
+      }
+      return next;
+    });
+  };
+
+  const handleFolderClick = (folderName: string) => {
+    setSelectedFolder(folderName);
+  };
+
+  const organizeNotesByFolder = () => {
+    const organized: Record<string, Note[]> = {};
+    const unfiled: Note[] = [];
+
+    notes.forEach((note) => {
+      const folder = note.folder?.trim();
+      if (folder) {
+        if (!organized[folder]) {
+          organized[folder] = [];
+        }
+        organized[folder].push(note);
+      } else {
+        unfiled.push(note);
+      }
+    });
+
+    // Sort notes within each folder by updated_at
+    Object.keys(organized).forEach((folder) => {
+      organized[folder].sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
+
+    unfiled.sort((a, b) => 
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+
+    return { organized, unfiled };
   };
 
   const filterAndSortNotes = () => {
@@ -77,6 +139,14 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
           note.title.toLowerCase().includes(query) ||
           note.content.toLowerCase().includes(query)
       );
+    }
+
+    if (selectedFolder && selectedFolder !== 'All') {
+      if (selectedFolder === 'Unfiled') {
+        filtered = filtered.filter((n) => !n.folder || !n.folder.trim());
+      } else {
+        filtered = filtered.filter((n) => (n.folder || '').trim() === selectedFolder);
+      }
     }
 
     filtered = [...filtered].sort((a, b) => {
@@ -102,7 +172,93 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
   };
 
   const handleNewNote = () => {
+    // Store selected folder for auto-assignment when note is created
+    if (selectedFolder && selectedFolder !== 'All' && selectedFolder !== 'Unfiled') {
+      localStorage.setItem('pinn.pendingFolder', selectedFolder);
+    } else {
+      localStorage.removeItem('pinn.pendingFolder');
+    }
     onNavigateToEditor();
+  };
+
+  const handleCreateFolder = () => {
+    setAssignAfterCreateNoteId(null);
+    setNewFolderName('');
+    setShowFolderDialog(true);
+  };
+
+  const handleRenameFolder = (name: string) => {
+    setFolderToRename(name);
+    setNewFolderName(name);
+    setShowFolderDialog(true);
+  };
+
+  const handleDeleteFolderClick = (name: string) => {
+    setFolderToDelete(name);
+    // Count how many notes are in this folder to decide dialog variant
+    try {
+      const count = notes.reduce((acc, n) => acc + (((n.folder || '').trim() === name) ? 1 : 0), 0);
+      setFolderDeleteCount(count);
+    } catch {
+      setFolderDeleteCount(0);
+    }
+    setShowFolderDeleteDialog(true);
+  };
+
+  const handleAssignFolder = (noteId: string, value: string) => {
+    if (value === '__new__') {
+      setAssignAfterCreateNoteId(noteId);
+      setNewFolderName('');
+      setShowFolderDialog(true);
+      return;
+    }
+    const folder = value === 'Unfiled' ? undefined : (value || undefined);
+    const updated = setNoteFolder(noteId, folder);
+    if (updated) {
+      loadNotes();
+    }
+  };
+
+  const confirmCreateFolder = () => {
+    const normalized = (newFolderName || '').trim();
+    if (!normalized) {
+      setShowFolderDialog(false);
+      return;
+    }
+    if (folderToRename && folderToRename !== normalized) {
+      storageRenameFolder(folderToRename, normalized);
+      loadNotes();
+      setSelectedFolder(normalized);
+    } else {
+      // Persist new folder and refresh
+      addFolder(normalized);
+      setFolders(['All', 'Unfiled', ...getAllFolders()]);
+      if (!assignAfterCreateNoteId) setSelectedFolder(normalized);
+    }
+
+    if (assignAfterCreateNoteId) {
+      const updated = setNoteFolder(assignAfterCreateNoteId, normalized);
+      if (updated) {
+        loadNotes();
+      }
+    } else {
+      // already handled above
+    }
+
+    setAssignAfterCreateNoteId(null);
+    setNewFolderName('');
+    setFolderToRename(null);
+    setShowFolderDialog(false);
+  };
+
+  const confirmDeleteFolder = (mode: 'delete-notes' | 'move-to-unfiled') => {
+    if (!folderToDelete) return;
+    storageDeleteFolder(folderToDelete, mode);
+    setShowFolderDeleteDialog(false);
+    setFolderToDelete(null);
+    setFolderDeleteCount(0);
+    if (selectedFolder === folderToDelete) setSelectedFolder('All');
+    loadNotes();
   };
 
   const handleDeleteNote = (noteId: string, e: React.MouseEvent) => {
@@ -250,6 +406,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
             id: crypto.randomUUID(),
             title: note.title || 'Untitled',
             content: note.content || '',
+            folder: (typeof note.folder === 'string' && note.folder.trim()) ? note.folder.trim() : undefined,
             created_at: note.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));
@@ -257,6 +414,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
           // Merge with existing notes
           const allNotes = [...importedNotes, ...existingNotes];
           writeAll(allNotes);
+          setFolders(['All', 'Unfiled', ...getAllFolders()]);
 
           // Reload notes
           loadNotes();
@@ -300,11 +458,11 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
     let text = content;
     
     // Handle markdown tables - extract text from table rows
-    text = text.replace(/\|(.+)\|/g, (match, content) => {
+    text = text.replace(/\|(.+)\|/g, (_match, content: string) => {
       // Skip separator rows (like |-----: |-----: |)
       if (content.match(/^[\s-:]+$/)) return '';
       // Extract cell contents and join with spaces
-      const cells = content.split('|').map(c => c.trim()).filter(c => c && !c.match(/^[-:]+$/));
+      const cells = content.split('|').map((c: string) => c.trim()).filter((c: string) => c && !c.match(/^[-:]+$/));
       return cells.join(' ');
     });
     
@@ -355,8 +513,16 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
+  const { organized, unfiled } = organizeNotesByFolder();
+  // Include empty folders from the persisted list so they show in the sidebar
+  const folderSet = new Set<string>([
+    ...Object.keys(organized),
+    ...folders.filter((f) => f !== 'All' && f !== 'Unfiled'),
+  ]);
+  const sortedFolders = Array.from(folderSet).sort((a, b) => a.localeCompare(b));
+
   return (
-    <div className="min-h-screen bg-[#2c3440]">
+    <div className="min-h-screen bg-[#2c3440] flex flex-col">
       <header className="sticky top-0 z-50 bg-[#2c3440] flex items-center justify-between px-6 py-4 border-b border-gray-700">
         <div className="flex items-center gap-4">
           <button
@@ -443,72 +609,265 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
-        <div className="relative mb-12">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#3a4450] border border-gray-600 rounded-lg pl-12 pr-4 py-3 text-gray-300 placeholder-gray-500 focus:outline-none focus:border-gray-500 transition-colors"
-          />
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside 
+          className="bg-[#2c3440] border-r border-gray-700 overflow-y-auto w-[280px] min-w-[200px] flex-shrink-0"
+        >
+          <div className="p-4 space-y-2">
+            {/* Search in sidebar */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#3a4450] border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
+              />
+            </div>
 
-        {loading ? (
-          <div className="text-center text-gray-500 py-12">Loading notes...</div>
-        ) : filteredNotes.length > 0 ? (
-          <>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm uppercase tracking-wider text-gray-500">
-                Recently Modified
-              </h3>
+            {/* All Notes */}
+            <div className="mb-2">
               <button
-                onClick={() => setSortBy(sortBy === 'title' ? 'date' : 'title')}
-                className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
+                onClick={() => handleFolderClick('All')}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  selectedFolder === 'All'
+                    ? 'bg-[#3a4450] text-white'
+                    : 'text-gray-400 hover:bg-[#3a4450] hover:text-gray-200'
+                }`}
               >
-                Sort By: {sortBy === 'title' ? 'Title' : 'Date'}
+                <Book className="w-4 h-4" />
+                <span className="flex-1 text-left">All Notes</span>
+                <span className="text-xs text-gray-600">{notes.length}</span>
               </button>
             </div>
 
-            <div className="space-y-6">
-              {filteredNotes.map((note) => (
-                <div
-                  key={note.id}
-                  className="group relative bg-[#3a4450] rounded-lg p-4 hover:bg-[#424d5a] transition-colors cursor-pointer"
-                  onClick={() => onNavigateToEditor(note.id)}
+            {/* Unfiled Notes */}
+            {unfiled.length > 0 && (
+              <div className="mb-2">
+                <button
+                  onClick={() => handleFolderClick('Unfiled')}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedFolder === 'Unfiled'
+                      ? 'bg-[#3a4450] text-white'
+                      : 'text-gray-400 hover:bg-[#3a4450] hover:text-gray-200'
+                  }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-lg text-gray-300 group-hover:text-white transition-colors mb-2">
-                        {note.title}
-                      </h4>
-                      <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-                        {getPreview(note.content)}
-                      </p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span>{formatDate(note.updated_at)}</span>
-                        <span>{note.content.length} characters</span>
+                  <Book className="w-4 h-4" />
+                  <span className="flex-1 text-left">Unfiled</span>
+                  <span className="text-xs text-gray-600">{unfiled.length}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Folders */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Folders</span>
+                <button
+                  onClick={handleCreateFolder}
+                  className="text-xs text-gray-500 hover:text-gray-300 p-1"
+                  title="New Folder"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+              {sortedFolders.length === 0 && (
+                <div className="px-3 pb-2 text-xs text-gray-500 flex items-center gap-2">
+                  <span>No folders yet</span>
+                  <button
+                    onClick={handleCreateFolder}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-[#3a4450]"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>New folder</span>
+                  </button>
+                </div>
+              )}
+              {sortedFolders.map((folderName) => {
+                  const folderNotes = organized[folderName] || [];
+                  const isExpanded = expandedFolders.has(folderName);
+                  const filteredFolderNotes = searchQuery
+                    ? folderNotes.filter(
+                        (note) =>
+                          note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          note.content.toLowerCase().includes(searchQuery.toLowerCase())
+                      )
+                    : folderNotes;
+
+                  return (
+                    <div key={folderName} className="mb-1">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleFolder(folderName)}
+                          className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+                          title={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </button>
+                        <div className={`group flex-1 flex items-center gap-2 px-1 rounded-lg text-sm min-w-0`}>
+                          <button
+                            onClick={() => handleFolderClick(folderName)}
+                            className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg transition-colors min-w-0 ${
+                              selectedFolder === folderName
+                                ? 'bg-[#3a4450] text-white'
+                                : 'text-gray-400 hover:bg-[#3a4450] hover:text-gray-200'
+                            }`}
+                          >
+                          {isExpanded ? (
+                            <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                          ) : (
+                            <Folder className="w-4 h-4 flex-shrink-0" />
+                          )}
+                          <span className="flex-1 text-left truncate">
+                            {folderName}
+                          </span>
+                          </button>
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-2">
+                            <button
+                              title="Rename folder"
+                              onClick={() => handleRenameFolder(folderName)}
+                              className="p-1 text-gray-500 hover:text-gray-300 rounded"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              title="Delete folder"
+                              onClick={() => handleDeleteFolderClick(folderName)}
+                              className="p-1 text-gray-500 hover:text-red-400 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {isExpanded && filteredFolderNotes.length > 0 && (
+                        <div className="ml-7 mt-1 space-y-0.5">
+                          {filteredFolderNotes.map((note) => (
+                            <div key={note.id} className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm text-gray-400 hover:bg-[#3a4450] hover:text-gray-200 transition-colors truncate min-w-0">
+                              <Book className="w-3 h-3 flex-shrink-0" />
+                              <button
+                                onClick={() => onNavigateToEditor(note.id)}
+                                className="flex-1 text-left truncate"
+                                title={note.title}
+                              >
+                                {note.title}
+                              </button>
+                              <button
+                                title="Edit note"
+                                onClick={() => onNavigateToEditor(note.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-gray-300 rounded"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                title="Delete note"
+                                onClick={() => {
+                                  setNoteToDelete(note.id);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Empty state intentionally minimal - no extra call-to-action here */}
+            {sortedFolders.length === 0 && unfiled.length === 0 && !loading && null}
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-6 py-12">
+            {loading ? (
+              <div className="text-center text-gray-500 py-12">Loading notes...</div>
+            ) : filteredNotes.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm uppercase tracking-wider text-gray-500">
+                    {selectedFolder === 'All' ? 'All Notes' : selectedFolder === 'Unfiled' ? 'Unfiled Notes' : `Notes in "${selectedFolder}"`}
+                  </h3>
+                  <button
+                    onClick={() => setSortBy(sortBy === 'title' ? 'date' : 'title')}
+                    className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
+                  >
+                    Sort By: {sortBy === 'title' ? 'Title' : 'Date'}
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {filteredNotes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="group relative bg-[#3a4450] rounded-lg p-4 hover:bg-[#424d5a] transition-colors cursor-pointer"
+                      onClick={() => onNavigateToEditor(note.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="text-lg text-gray-300 group-hover:text-white transition-colors mb-2">
+                            {note.title}
+                          </h4>
+                          <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                            {getPreview(note.content)}
+                          </p>
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <span>{formatDate(note.updated_at)}</span>
+                            <span>{note.content.length} characters</span>
+                            {selectedFolder === 'All' && (
+                              <span className="px-2 py-0.5 rounded bg-[#2c3440] border border-gray-700 text-gray-400">
+                                {note.folder && note.folder.trim() ? note.folder : 'Unfiled'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            onClick={(e) => e.stopPropagation()}
+                            value={note.folder && note.folder.trim() ? note.folder : 'Unfiled'}
+                            onChange={(e) => handleAssignFolder(note.id, e.target.value)}
+                            title={note.folder || 'Unfiled'}
+                            className="text-sm bg-[#2c3440] border border-gray-700 rounded px-2 py-1 text-gray-300 max-w-[200px]"
+                          >
+                            <option value="Unfiled">Unfiled</option>
+                            {folders.filter((f) => f !== 'All' && f !== 'Unfiled').map((f) => (
+                              <option key={f} value={f}>{f.length > 40 ? `${f.slice(0, 37)}...` : f}</option>
+                            ))}
+                            <option value="__new__">+ New folder…</option>
+                          </select>
+                          <button
+                            onClick={(e) => handleDeleteNote(note.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-[#2c3440] rounded transition-all"
+                            title="Delete note"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteNote(note.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-[#2c3440] rounded transition-all"
-                      title="Delete note"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="text-center text-gray-500 py-12">
-            {searchQuery ? 'No notes found' : 'No notes yet. Create your first note!'}
+              </>
+            ) : (
+              <div className="text-center text-gray-500 py-12">
+                {searchQuery ? 'No notes found' : selectedFolder === 'All' ? 'No notes yet. Create your first note!' : `No notes in "${selectedFolder}"`}
+              </div>
+            )}
           </div>
-        )}
-      </main>
+        </main>
+      </div>
 
       <button
         onClick={handleNewNote}
@@ -554,6 +913,135 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
         isOpen={showSettingsDialog}
         onClose={() => setShowSettingsDialog(false)}
       />
+
+      {showFolderDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#2c3440] rounded-xl shadow-2xl w-full max-w-md border border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-light text-gray-200">{folderToRename ? 'Rename Folder' : 'New Folder'}</h2>
+                <button
+                  onClick={() => {
+                    setShowFolderDialog(false);
+                    setAssignAfterCreateNoteId(null);
+                    setNewFolderName('');
+                    setFolderToRename(null);
+                  }}
+                  className="text-gray-400 hover:text-white hover:bg-[#3a4450] rounded-lg p-1.5 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Folder name</label>
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Enter folder name..."
+                  className="w-full bg-[#1f2833] border border-gray-700 rounded-lg px-4 py-3 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#e8935f] focus:border-transparent transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowFolderDialog(false);
+                    setAssignAfterCreateNoteId(null);
+                    setNewFolderName('');
+                    setFolderToRename(null);
+                  }}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-[#3a4450] rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmCreateFolder}
+                  disabled={!newFolderName.trim()}
+                  className="px-5 py-2.5 text-sm font-medium bg-[#e8935f] hover:bg-[#d8834f] text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#e8935f] shadow-lg hover:shadow-xl"
+                >
+                  {folderToRename ? 'Rename' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFolderDeleteDialog && folderToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#2c3440] rounded-xl shadow-2xl w-full max-w-md border border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-light text-gray-200">Delete Folder</h2>
+                <button
+                  onClick={() => {
+                    setShowFolderDeleteDialog(false);
+                    setFolderToDelete(null);
+                  }}
+                  className="text-gray-400 hover:text-white hover:bg-[#3a4450] rounded-lg p-1.5 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-6 space-y-6">
+              {folderDeleteCount > 0 ? (
+                <>
+                  <div className="text-gray-300">
+                    <div className="mb-2">The folder</div>
+                    <div className="inline-block max-w-full px-2 py-1 rounded border border-gray-700 bg-[#1f2833] text-[#e8935f] font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={folderToDelete}>{folderToDelete}</div>
+                    <div className="mt-3">contains notes. What would you like to do?</div>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => confirmDeleteFolder('move-to-unfiled')}
+                      className="px-5 py-2.5 text-sm font-medium bg-[#3a4450] hover:bg-[#424d5a] text-gray-100 rounded-lg transition-all text-left"
+                    >
+                      Move notes to Unfiled and delete folder
+                    </button>
+                    <button
+                      onClick={() => confirmDeleteFolder('delete-notes')}
+                      className="px-5 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all text-left"
+                    >
+                      Delete folder and all notes inside
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-gray-300">
+                    <div className="mb-2">Delete empty folder</div>
+                    <div className="inline-block max-w-full px-2 py-1 rounded border border-gray-700 bg-[#1f2833] text-[#e8935f] font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={folderToDelete}>{folderToDelete}</div>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowFolderDeleteDialog(false);
+                        setFolderToDelete(null);
+                        setFolderDeleteCount(0);
+                      }}
+                      className="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-[#3a4450] rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => confirmDeleteFolder('move-to-unfiled')}
+                      className="px-5 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all"
+                    >
+                      Delete folder
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

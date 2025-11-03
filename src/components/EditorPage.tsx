@@ -25,7 +25,7 @@ import {
   Settings,
   Sparkles,
 } from 'lucide-react';
-import { getNoteById, saveNote, createNote, deleteNote, getNotes, writeAll } from '../lib/storage';
+import { getNoteById, saveNote, createNote, deleteNote, getNotes, writeAll, getAllFolders, setNoteFolder } from '../lib/storage';
 import { getFlows, createFlow, addNoteToFlow, Flow, getFlowsContainingNote } from '../lib/flowStorage';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
@@ -50,6 +50,10 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
   const [saving, setSaving] = useState(false);
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(noteId);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [folder, setFolder] = useState<string>('Unfiled');
+  const [folders, setFolders] = useState<string[]>([]);
+  const [showFolderDialog, setShowFolderDialog] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   const [showFlowModal, setShowFlowModal] = useState(false);
   const [flows, setFlows] = useState<Pick<Flow, 'id' | 'title'>[]>([]);
   const [newFlowName, setNewFlowName] = useState('');
@@ -92,8 +96,16 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
       setContent('');
       // When creating a new note, default to edit mode
       setEditorMode('markdown');
+      // Check for pending folder from NotesPage
+      const pendingFolder = localStorage.getItem('pinn.pendingFolder');
+      if (pendingFolder) {
+        setFolder(pendingFolder);
+      } else {
+        setFolder('Unfiled');
+      }
     }
     loadFlows();
+    setFolders(['Unfiled', ...getAllFolders()]);
   }, [noteId]);
 
   useEffect(() => {
@@ -139,6 +151,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
         setTitle(data.title);
         setContent(data.content);
         setCurrentNoteId(data.id);
+        setFolder(data.folder && data.folder.trim() ? data.folder : 'Unfiled');
       }
     } catch (error) {
       console.error('Error loading note:', error);
@@ -207,13 +220,22 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
             id: currentNoteId,
             title: title || 'Untitled',
             content,
+            folder: folder === 'Unfiled' ? undefined : folder,
             created_at: getNoteById(currentNoteId)?.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
           setCurrentNoteId(updated.id);
         } else {
+          // Check for pending folder from NotesPage
+          const pendingFolder = localStorage.getItem('pinn.pendingFolder');
           const created = createNote(title || 'Untitled', content);
           setCurrentNoteId(created.id);
+          // Assign folder if pending
+          if (pendingFolder) {
+            setNoteFolder(created.id, pendingFolder);
+            setFolder(pendingFolder);
+            localStorage.removeItem('pinn.pendingFolder');
+          }
         }
       } catch (e) {
         console.error('Autosave error:', e);
@@ -342,6 +364,38 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setMenuOpen(false);
+  };
+
+  const handleFolderChange = (value: string) => {
+    setFolder(value);
+    if (!currentNoteId) return;
+    if (value === '__new__') {
+      setNewFolderName('');
+      setShowFolderDialog(true);
+      return;
+    }
+    const target = value === 'Unfiled' ? undefined : value;
+    setNoteFolder(currentNoteId, target);
+  };
+
+  const confirmCreateFolder = () => {
+    const normalized = (newFolderName || '').trim();
+    if (!normalized || !currentNoteId) {
+      setShowFolderDialog(false);
+      return;
+    }
+    const updated = setNoteFolder(currentNoteId, normalized);
+    if (updated) {
+      setFolder(normalized);
+      setFolders(() => {
+        const base = ['Unfiled', ...getAllFolders()];
+        const next = new Set(base);
+        next.add(normalized);
+        return Array.from(next).sort((a, b) => a.localeCompare(b));
+      });
+    }
+    setNewFolderName('');
+    setShowFolderDialog(false);
   };
 
   const handleExportAll = async () => {
@@ -490,6 +544,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
             id: crypto.randomUUID(),
             title: note.title || 'Untitled',
             content: note.content || '',
+            folder: (typeof note.folder === 'string' && note.folder.trim()) ? note.folder.trim() : undefined,
             created_at: note.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));
@@ -497,6 +552,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
           // Merge with existing notes
           const allNotes = [...importedNotes, ...existingNotes];
           writeAll(allNotes);
+          setFolders(['Unfiled', ...getAllFolders()]);
 
           // Reload the current note if needed
           if (currentNoteId) {
@@ -794,6 +850,21 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
             </div>
 
             <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-500">Folder</label>
+                <select
+                  value={folder}
+                  onChange={(e) => handleFolderChange(e.target.value)}
+                  title={folder}
+                  className="text-sm bg-[#3a4450] border border-gray-700 rounded px-2 py-1 text-gray-300 max-w-[200px]"
+                >
+                  <option value="Unfiled">Unfiled</option>
+                  {folders.map((f) => (
+                    <option key={f} value={f}>{f.length > 40 ? `${f.slice(0, 37)}...` : f}</option>
+                  ))}
+                  <option value="__new__">+ New folder…</option>
+                </select>
+              </div>
               {editorMode === 'markdown' && (
                 <button
                   onClick={() => {
@@ -1093,6 +1164,60 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
           onAccept={handleAcceptAIChange}
           onReject={handleRejectAIChange}
         />
+      )}
+
+      {showFolderDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#2c3440] rounded-xl shadow-2xl w-full max-w-md border border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-light text-gray-200">New Folder</h2>
+                <button
+                  onClick={() => {
+                    setShowFolderDialog(false);
+                    setNewFolderName('');
+                  }}
+                  className="text-gray-400 hover:text-white hover:bg-[#3a4450] rounded-lg p-1.5 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Folder name</label>
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Enter folder name..."
+                  className="w-full bg-[#1f2833] border border-gray-700 rounded-lg px-4 py-3 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#e8935f] focus:border-transparent transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowFolderDialog(false);
+                    setNewFolderName('');
+                  }}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-[#3a4450] rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmCreateFolder}
+                  disabled={!newFolderName.trim()}
+                  className="px-5 py-2.5 text-sm font-medium bg-[#e8935f] hover:bg-[#d8834f] text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#e8935f] shadow-lg hover:shadow-xl"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
