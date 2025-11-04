@@ -442,15 +442,23 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
                       Recently Created Flows
                     </h3>
                   </div>
+                  <div className="flex items-center gap-3">
                   <button
                     onClick={() => setFlowSortBy(flowSortBy === 'title' ? 'date' : 'title')}
                     className="text-sm text-gray-500 hover:text-gray-300 transition-colors px-3 py-1 rounded-md hover:bg-[#3a4450]"
                   >
                     Sort By: {flowSortBy === 'title' ? 'Title' : 'Date'}
                   </button>
+                    <button
+                      onClick={onNavigateToFlows}
+                      className="text-sm text-gray-500 hover:text-gray-300 transition-colors px-3 py-1 rounded-md hover:bg-[#3a4450]"
+                    >
+                      View All
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredFlows.slice(0, 6).map((flow) => (
+                  {filteredFlows.slice(0, 4).map((flow) => (
                     <button
                       key={flow.id}
                       onClick={() => onNavigateToFlow(flow.id)}
@@ -488,15 +496,23 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
                       Recently Modified Notes
                     </h3>
                   </div>
+                  <div className="flex items-center gap-3">
                   <button
                     onClick={() => setSortBy(sortBy === 'title' ? 'date' : 'title')}
                     className="text-sm text-gray-500 hover:text-gray-300 transition-colors px-3 py-1 rounded-md hover:bg-[#3a4450]"
                   >
                     Sort By: {sortBy === 'title' ? 'Title' : 'Date'}
                   </button>
+                    <button
+                      onClick={onNavigateToNotes}
+                      className="text-sm text-gray-500 hover:text-gray-300 transition-colors px-3 py-1 rounded-md hover:bg-[#3a4450]"
+                    >
+                      View All
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredNotes.map((note) => (
+                  {filteredNotes.slice(0, 6).map((note) => (
                     <button
                       key={note.id}
                       onClick={() => onNavigateToEditor(note.id)}
