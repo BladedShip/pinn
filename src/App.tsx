@@ -6,7 +6,7 @@ import FlowPage from './components/FlowPage';
 import NotesPage from './components/NotesPage';
 import OnboardingDialog from './components/OnboardingDialog';
 import { FileText, Folder, X, AlertCircle } from 'lucide-react';
-import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, restoreDirectoryAccess, getFolderPath } from './lib/fileSystemStorage';
+import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, hasValidDirectoryAccess, restoreDirectoryAccess, getFolderPath } from './lib/fileSystemStorage';
 import { initStorage, refreshStorage } from './lib/storage';
 import { initFlowStorage, refreshFlowStorage } from './lib/flowStorage';
 
@@ -52,6 +52,10 @@ function App() {
         // Give a tiny delay to ensure handle is fully set
         await new Promise(resolve => setTimeout(resolve, 10));
         
+        // Check if we have valid access (handle exists AND permission is granted)
+        const hasValidAccess = handleAvailable ? await hasValidDirectoryAccess() : false;
+        console.log('Valid directory access check:', hasValidAccess);
+        
         // Initialize storage (will use file system or localStorage)
         // Storage will use file system if folder is configured (even if handle needs re-granting)
         await initStorage();
@@ -67,7 +71,9 @@ function App() {
         } else {
           console.log('Folder is configured, proceeding with app');
           // Check if we need to show permission restore banner
-          if (!handleAvailable) {
+          // Show banner if folder is configured but we don't have valid access
+          if (!hasValidAccess) {
+            console.log('Folder configured but no valid access, showing restore banner');
             setNeedsPermissionRestore(true);
           }
         }
@@ -88,21 +94,30 @@ function App() {
     setShowOnboarding(false);
   };
 
-  // Check if folder was removed (will trigger onboarding again)
+  // Check if folder was removed or access needs restoration (will trigger onboarding or banner)
   useEffect(() => {
     if (!isInitializing && !showOnboarding) {
-      const folderConfigured = isFolderConfigured();
-      const hasAccess = hasDirectoryAccess();
-      if (!folderConfigured && !isMobile) {
-        // Folder was removed, show onboarding
-        setShowOnboarding(true);
-      } else if (folderConfigured && !hasAccess && !isMobile) {
-        // Folder configured but access missing, show restore banner
-        setNeedsPermissionRestore(true);
-      } else if (hasAccess) {
-        // Access is available, hide restore banner
-        setNeedsPermissionRestore(false);
-      }
+      const checkAccess = async () => {
+        const folderConfigured = isFolderConfigured();
+        const hasAccess = hasDirectoryAccess();
+        
+        if (!folderConfigured && !isMobile) {
+          // Folder was removed, show onboarding
+          setShowOnboarding(true);
+        } else if (folderConfigured && !isMobile) {
+          // Check if we have valid access (not just handle existence)
+          const hasValidAccess = hasAccess ? await hasValidDirectoryAccess() : false;
+          if (!hasValidAccess) {
+            // Folder configured but access missing, show restore banner
+            setNeedsPermissionRestore(true);
+          } else {
+            // Valid access is available, hide restore banner
+            setNeedsPermissionRestore(false);
+          }
+        }
+      };
+      
+      checkAccess();
     }
   }, [isInitializing, showOnboarding, isMobile]);
 

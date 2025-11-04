@@ -94,12 +94,11 @@ async function restoreHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle |
         console.log('restoreHandleFromIndexedDB: Could not request permission automatically (user gesture may be required):', permError);
       }
       
-      // Permission is 'prompt' - return the handle anyway
-      // The handle exists and can be restored with user gesture
-      // Don't try to access it here as it requires user gesture
-      // But we should return the handle so it can be used when user clicks restore
-      console.log('restoreHandleFromIndexedDB: Permission is prompt - returning handle for user gesture restoration');
-      return handle; // Return the handle - it can be restored with user gesture
+      // Permission is 'prompt' - don't return the handle yet
+      // The handle exists but needs user gesture to restore permission
+      // Returning null so caller knows permission needs to be requested
+      console.log('restoreHandleFromIndexedDB: Permission is prompt - handle exists but needs user gesture to restore');
+      return null; // Return null - caller should request permission with user gesture
     } else {
       // Permission was denied - don't clear the handle, just return null
       // User might want to try restoring it, or they can re-select
@@ -155,6 +154,24 @@ export function isFolderConfigured(): boolean {
  */
 export function hasDirectoryAccess(): boolean {
   return directoryHandle !== null;
+}
+
+/**
+ * Check if we have a valid directory handle with granted permission
+ * This is more accurate than hasDirectoryAccess() as it verifies permission
+ */
+export async function hasValidDirectoryAccess(): Promise<boolean> {
+  if (!directoryHandle) {
+    return false;
+  }
+  
+  try {
+    const permission = await directoryHandle.queryPermission({ mode: 'readwrite' });
+    return permission === 'granted';
+  } catch (error) {
+    console.error('Error checking directory permission:', error);
+    return false;
+  }
 }
 
 /**
@@ -475,7 +492,7 @@ async function ensureDirectoryAccess(): Promise<FileSystemDirectoryHandle> {
       }
       throw new Error('Directory access was revoked. Please re-select your folder in settings to continue using file system storage.');
     } else {
-      throw new Error('No directory selected. Please select a folder in settings.');
+    throw new Error('No directory selected. Please select a folder in settings.');
     }
   }
   return directoryHandle;
