@@ -130,6 +130,26 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
             // We handle code blocks in the code component, so we just pass through
             return <pre {...props}>{children}</pre>;
           },
+          a({ node, href, children, ...props }: any) {
+            return (
+              <a
+                href={href}
+                {...props}
+                className="markdown-link"
+                style={{
+                  display: 'inline-block',
+                  maxWidth: '100%',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  whiteSpace: 'normal',
+                  boxSizing: 'border-box',
+                  minWidth: 0,
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {content || ''}
@@ -188,6 +208,8 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
           color: rgb(209, 213, 219);
           margin-bottom: 1rem;
           line-height: 1.625;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
         .markdown-preview a {
           color: rgb(229, 231, 235);
@@ -201,6 +223,12 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
           font-weight: 500;
           transition: all 0.2s ease;
           line-height: 1.4;
+          word-break: break-all;
+          overflow-wrap: anywhere;
+          max-width: 100%;
+          white-space: normal;
+          box-sizing: border-box;
+          min-width: 0;
         }
         .markdown-preview a:hover {
           background-color: rgba(96, 165, 250, 0.25);

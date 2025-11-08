@@ -853,7 +853,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
 
   return (
     <div className="min-h-screen bg-theme-bg-primary">
-      <header className="sticky top-0 z-50 bg-theme-bg-primary flex items-center justify-between px-6 py-4 border-b border-theme-border">
+      <header className="sticky top-0 z-50 bg-theme-bg-primary flex items-center justify-between px-6 py-4 border-b border-[#2a3038]">
         <div className="flex items-center gap-4">
           <button
             onClick={() => {
@@ -881,7 +881,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                   handleSaveTitle();
                 }
               }}
-              className="bg-theme-bg-secondary border border-gray-600 rounded-lg px-4 py-2 text-theme-text-primary focus:outline-none focus:border-gray-500 w-full"
+              className="bg-theme-bg-secondary border border-[#2a3038] rounded-lg px-4 py-2 text-theme-text-primary focus:outline-none focus:border-theme-accent/50 w-full"
               autoFocus
             />
           ) : (
@@ -935,10 +935,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
             </button>
             {showSearch && (
               <div 
-                className="absolute right-0 mt-2 w-96 bg-theme-bg-secondary border border-gray-600 rounded-lg shadow-xl z-50 overflow-hidden"
+                className="absolute right-0 mt-2 w-96 bg-theme-bg-secondary border border-[#2a3038] rounded-lg shadow-xl z-50 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-4 border-b border-gray-600 bg-theme-bg-primary">
+                <div className="p-4 border-b border-[#2a3038] bg-theme-bg-primary">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
@@ -946,7 +946,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                       placeholder="Search notes..."
                       value={searchQuery}
                       onChange={(e) => handleSearch(e.target.value)}
-                      className="w-full bg-theme-bg-secondary border border-gray-600 rounded-lg pl-10 pr-4 py-2.5 text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-theme-accent transition-colors text-sm"
+                      className="w-full bg-theme-bg-secondary border border-[#2a3038] rounded-lg pl-10 pr-4 py-2.5 text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-theme-accent transition-colors text-sm"
                       autoFocus
                     />
                   </div>
@@ -954,7 +954,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 <div className="max-h-80 overflow-y-auto scrollbar-hide">
                   {searchResults.length > 0 ? (
                     <>
-                      <div className="px-4 py-2 border-b border-gray-600 bg-theme-bg-primary">
+                      <div className="px-4 py-2 border-b border-[#2a3038] bg-theme-bg-primary">
                         <div className="flex items-center gap-2 text-xs text-theme-text-secondary">
                           {searchQuery ? (
                             <>
@@ -990,7 +990,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                             <button
                               key={note.id}
                               onClick={() => handleAddNote(note)}
-                              className="w-full text-left px-3 py-3 hover:bg-theme-bg-primary rounded-lg transition-colors group mb-1 border border-transparent hover:border-gray-600"
+                              className="w-full text-left px-3 py-3 hover:bg-theme-bg-primary rounded-lg transition-colors group mb-1 border border-transparent hover:border-[#3a4048]"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1048,7 +1048,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
       </header>
 
       <div className="flex h-[calc(100vh-73px)]">
-        <div className="w-64 bg-theme-bg-secondary border-r border-theme-border p-4 overflow-y-auto">
+        <div className="w-64 bg-theme-bg-secondary border-r border-[#2a3038] p-4 overflow-y-auto">
           <div className="mb-6">
             <div className="mb-3">
               <label className="text-xs font-medium text-theme-text-secondary block leading-tight">Default Node Color</label>
@@ -1061,10 +1061,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                   <button
                     key={color}
                     onClick={() => setDefaultNodeColor(color)}
-                    className={`relative w-9 h-9 rounded-lg border-2 transition-all hover:scale-105 ${
+                    className={`relative w-9 h-9 rounded-lg transition-all hover:scale-105 ${
                       isSelected
-                        ? 'border-gray-300 scale-105 ring-2 ring-gray-400/50 ring-offset-2 ring-offset-[#3a4450]'
-                        : 'border-theme-border hover:border-gray-600'
+                        ? 'border-2 border-[#1a1f26] scale-105 ring-2 ring-theme-accent/50 ring-offset-2 ring-offset-theme-bg-secondary'
+                        : 'border-2 border-[#2a3038] hover:border-[#3a4048]'
                     }`}
                     style={{ backgroundColor: color }}
                     title={color}
@@ -1077,10 +1077,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
               })}
             </div>
           </div>
-          <div className="border-t border-gray-600 mb-4"></div>
+          <div className="border-t border-[#2a3038] mb-4"></div>
           {selectedNodes.length > 0 && (
             <>
-              <div className="mb-4 p-3 bg-theme-bg-primary/40 rounded border border-theme-border/50">
+              <div className="mb-4 p-3 bg-theme-bg-primary/40 rounded border border-[#2a3038]">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -1141,10 +1141,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                           <button
                             key={color}
                             onClick={() => handleChangeSelectedNodesColor(color)}
-                            className={`relative w-7 h-7 rounded border transition-all ${
+                            className={`relative w-7 h-7 rounded border-2 transition-all ${
                               isSelected
-                                ? 'border-gray-400 ring-1 ring-gray-500/50'
-                                : 'border-theme-border hover:border-gray-600'
+                                ? 'border-[#1a1f26] ring-1 ring-theme-accent/40'
+                                : 'border-[#2a3038] hover:border-[#3a4048]'
                             }`}
                             style={{ backgroundColor: color }}
                             title={color}
@@ -1171,7 +1171,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                           className={`w-full px-2 py-1.5 rounded text-xs transition-all flex items-center justify-center gap-1.5 ${
                             allCompleted
                               ? 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 hover:border-green-500/50 text-green-400/80 hover:text-green-400'
-                              : 'bg-theme-bg-secondary/50 hover:bg-theme-bg-secondary border border-theme-border/50 hover:border-gray-600 text-theme-text-primary hover:text-white'
+                              : 'bg-[#2a3038]/30 hover:bg-[#2a3038]/50 border border-[#3a4048] hover:border-theme-accent/50 text-theme-text-secondary hover:text-theme-text-primary'
                           }`}
                         >
                           <CheckCircle2 className={`w-3 h-3 ${allCompleted ? '' : 'opacity-50'}`} />
@@ -1202,12 +1202,12 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                   </button>
                 </div>
               </div>
-              <div className="border-t border-gray-600 mb-4"></div>
+              <div className="border-t border-[#2a3038] mb-4"></div>
             </>
           )}
           {selectedEdges.length > 0 && (
             <>
-              <div className="mb-4 p-3 bg-theme-bg-primary/40 rounded border border-theme-border/50">
+              <div className="mb-4 p-3 bg-theme-bg-primary/40 rounded border border-[#2a3038]">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -1265,10 +1265,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                           <button
                             key={color}
                             onClick={() => handleChangeSelectedEdgesColor(color)}
-                            className={`relative w-7 h-7 rounded border transition-all ${
+                            className={`relative w-7 h-7 rounded border-2 transition-all ${
                               isSelected
-                                ? 'border-gray-400 ring-1 ring-gray-500/50'
-                                : 'border-theme-border hover:border-gray-600'
+                                ? 'border-[#1a1f26] ring-1 ring-theme-accent/40'
+                                : 'border-[#2a3038] hover:border-[#3a4048]'
                             }`}
                             style={{ backgroundColor: color }}
                             title={color}
@@ -1298,7 +1298,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                   </button>
                 </div>
               </div>
-              <div className="border-t border-gray-600 mb-4"></div>
+              <div className="border-t border-[#2a3038] mb-4"></div>
             </>
           )}
           <h3 className="text-sm uppercase tracking-wider text-gray-500 mb-4">Tags</h3>
@@ -1406,9 +1406,9 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
           </ReactFlowProvider>
 
           {showNodeOptions && (
-            <div className="absolute top-4 right-4 bg-theme-bg-primary border border-theme-border rounded-lg shadow-xl p-5 z-50 w-72 backdrop-blur-sm">
+            <div className="absolute top-4 right-4 bg-theme-bg-primary border border-[#2a3038] rounded-lg shadow-xl p-5 z-50 w-72 backdrop-blur-sm">
               {/* Header */}
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-theme-border/50">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2a3038]">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-theme-text-primary truncate">
                     {showNodeOptions.data.label || 'Untitled Node'}
@@ -1449,10 +1449,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                         <button
                           key={color}
                           onClick={() => handleChangeNodeColor(showNodeOptions.id, color)}
-                          className={`relative w-9 h-9 rounded-lg border-2 transition-all hover:scale-105 ${
+                          className={`relative w-9 h-9 rounded-lg transition-all hover:scale-105 ${
                             isCurrentColor
-                              ? 'border-gray-300 scale-105 ring-2 ring-gray-400/50 ring-offset-2 ring-offset-[#2c3440]'
-                              : 'border-theme-border hover:border-gray-600'
+                              ? 'border-2 border-[#1a1f26] scale-105 ring-2 ring-theme-accent/50 ring-offset-2 ring-offset-theme-bg-primary'
+                              : 'border-2 border-[#2a3038] hover:border-[#3a4048]'
                           }`}
                           style={{ backgroundColor: color }}
                           title={color}
@@ -1477,7 +1477,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                       {(showNodeOptions.data.tags || []).map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-theme-bg-secondary/50 border border-theme-border/50 text-theme-text-primary text-xs rounded-md hover:bg-theme-bg-secondary transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-theme-bg-secondary/50 border border-[#2a3038] text-theme-text-primary text-xs rounded-md hover:bg-theme-bg-secondary transition-colors"
                         >
                           {tag}
                           <button
@@ -1502,7 +1502,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                         }
                       }}
                       placeholder="Add tag..."
-                      className="flex-1 bg-theme-bg-secondary/50 border border-theme-border rounded-md px-3 py-1.5 text-sm text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-theme-accent/50 focus:bg-theme-bg-secondary transition-colors"
+                      className="flex-1 bg-[#2a3038]/30 border border-[#3a4048] rounded-md px-3 py-1.5 text-sm text-theme-text-primary placeholder-gray-600 focus:outline-none focus:border-theme-accent focus:bg-[#2a3038]/50 transition-colors"
                     />
                     <button
                       onClick={() => handleAddTagToNode(showNodeOptions.id, newTag)}
@@ -1516,13 +1516,13 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Completed Toggle */}
-                <div className="pt-2 border-t border-theme-border/50">
+                <div className="pt-2 border-t border-[#2a3038]">
                   <button
                     onClick={() => handleToggleCompleted(showNodeOptions.id)}
                     className={`w-full px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       showNodeOptions.data.completed
                         ? 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 hover:border-green-500/50 text-green-400 hover:text-green-300'
-                        : 'bg-theme-bg-secondary/50 hover:bg-theme-bg-secondary border border-theme-border/50 hover:border-gray-600 text-theme-text-primary hover:text-white'
+                        : 'bg-[#2a3038]/30 hover:bg-[#2a3038]/50 border border-[#3a4048] hover:border-theme-accent/50 text-theme-text-secondary hover:text-theme-text-primary'
                     }`}
                   >
                     <CheckCircle2 className={`w-4 h-4 ${showNodeOptions.data.completed ? '' : 'opacity-50'}`} />
@@ -1531,7 +1531,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Delete Button */}
-                <div className="pt-2 border-t border-theme-border/50">
+                <div className="pt-2 border-t border-[#2a3038]">
                   <button
                     onClick={() => handleDeleteNode(showNodeOptions.id)}
                     className="w-full px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 text-red-400 hover:text-red-300 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
@@ -1547,9 +1547,9 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
           {showEdgeOptions && (
             <div
               ref={edgeOptionsRef}
-              className="absolute top-4 right-4 bg-theme-bg-primary border border-theme-border rounded-lg shadow-xl p-5 z-50 w-72 backdrop-blur-sm"
+              className="absolute top-4 right-4 bg-theme-bg-primary border border-[#2a3038] rounded-lg shadow-xl p-5 z-50 w-72 backdrop-blur-sm"
             >
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-theme-border/50">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2a3038]">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-theme-text-primary">Edge Options</h4>
                   <p className="text-xs text-gray-500">Connection settings</p>
@@ -1576,10 +1576,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                         <button
                           key={color}
                           onClick={() => handleChangeEdgeColor(showEdgeOptions.id, color)}
-                          className={`relative w-9 h-9 rounded-lg border-2 transition-all hover:scale-105 ${
+                          className={`relative w-9 h-9 rounded-lg transition-all hover:scale-105 ${
                             isCurrentColor
-                              ? 'border-gray-300 scale-105 ring-2 ring-gray-400/50 ring-offset-2 ring-offset-[#2c3440]'
-                              : 'border-theme-border hover:border-gray-600'
+                              ? 'border-2 border-[#1a1f26] scale-105 ring-2 ring-theme-accent/50 ring-offset-2 ring-offset-theme-bg-primary'
+                              : 'border-2 border-[#2a3038] hover:border-[#3a4048]'
                           }`}
                           style={{ backgroundColor: color }}
                           title={color}
@@ -1594,7 +1594,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Delete Button */}
-                <div className="pt-2 border-t border-theme-border/50">
+                <div className="pt-2 border-t border-[#2a3038]">
                   <button
                     onClick={() => handleDeleteEdge(showEdgeOptions.id)}
                     className="w-full px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 text-red-400 hover:text-red-300 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
@@ -1618,10 +1618,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
           }}
         >
           <div 
-            className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-600"
+            className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-[#2a3038]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-[#3a4450] to-[#2c3440] px-6 py-5 border-b border-theme-border">
+            <div className="bg-gradient-to-r from-[#3a4450] to-[#2c3440] px-6 py-5 border-b border-[#2a3038]">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="mb-2">
@@ -1651,7 +1651,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                             setEditingNoteTitle(false);
                           }
                         }}
-                        className="text-2xl font-semibold text-gray-100 bg-transparent border-b-2 border-gray-600 focus:border-gray-400 focus:outline-none w-full"
+                        className="text-2xl font-semibold text-gray-100 bg-transparent border-b-2 border-[#2a3038] focus:border-theme-accent/50 focus:outline-none w-full"
                         autoFocus
                       />
                     ) : (
@@ -1689,7 +1689,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                           {selectedNode.data.tags.map((tag) => (
                             <span
                               key={tag}
-                              className="px-2 py-0.5 bg-theme-bg-primary text-theme-text-primary text-xs rounded border border-gray-600"
+                              className="px-2 py-0.5 bg-theme-bg-primary text-theme-text-primary text-xs rounded border border-[#2a3038]"
                             >
                               {tag}
                             </span>
@@ -1743,10 +1743,10 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
           onClick={() => setShowHelp(false)}
         >
           <div 
-            className="bg-theme-bg-darkest rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-theme-border"
+            className="bg-theme-bg-darkest rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-[#2a3038]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-5 border-b border-theme-border bg-theme-bg-darkest">
+            <div className="px-6 py-5 border-b border-[#2a3038] bg-theme-bg-darkest">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-theme-accent/15 flex items-center justify-center">
@@ -1769,8 +1769,8 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
             <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6 bg-theme-bg-darkest">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Nodes Section */}
-                <div className="bg-theme-bg-primary rounded-xl p-5 border border-theme-border transition-all shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-theme-border">
+                <div className="bg-theme-bg-primary rounded-xl p-5 border border-[#2a3038] transition-all shadow-sm">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#2a3038]">
                     <div className="w-8 h-8 rounded-lg bg-theme-accent/15 flex items-center justify-center">
                       <FileText className="w-4 h-4 text-theme-accent" />
                     </div>
@@ -1817,8 +1817,8 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Edges Section */}
-                <div className="bg-theme-bg-primary rounded-xl p-5 border border-theme-border transition-all shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-theme-border">
+                <div className="bg-theme-bg-primary rounded-xl p-5 border border-[#2a3038] transition-all shadow-sm">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#2a3038]">
                     <div className="w-8 h-8 rounded-lg bg-[#8B5CF6]/15 flex items-center justify-center">
                       <GitBranch className="w-4 h-4 text-[#8B5CF6]" />
                     </div>
@@ -1859,8 +1859,8 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Sidebar Section */}
-                <div className="bg-theme-bg-primary rounded-xl p-5 border border-theme-border transition-all shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-theme-border">
+                <div className="bg-theme-bg-primary rounded-xl p-5 border border-[#2a3038] transition-all shadow-sm">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#2a3038]">
                     <div className="w-8 h-8 rounded-lg bg-[#EC4899]/15 flex items-center justify-center">
                       <Palette className="w-4 h-4 text-[#EC4899]" />
                     </div>
@@ -1883,8 +1883,8 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
 
                 {/* Quick Actions */}
-                <div className="bg-theme-bg-primary rounded-xl p-5 border border-theme-border transition-all shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-theme-border">
+                <div className="bg-theme-bg-primary rounded-xl p-5 border border-[#2a3038] transition-all shadow-sm">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#2a3038]">
                     <div className="w-8 h-8 rounded-lg bg-[#10B981]/15 flex items-center justify-center">
                       <PlusCircle className="w-4 h-4 text-[#10B981]" />
                     </div>

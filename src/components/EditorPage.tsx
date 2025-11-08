@@ -35,6 +35,7 @@ import SettingsDialog from './SettingsDialog';
 import AIPromptDialog from './AIPromptDialog';
 import AIComparisonDialog from './AIComparisonDialog';
 import JSZip from 'jszip';
+import { exportToPDF } from '../lib/pdfExport';
 
 interface EditorPageProps {
   noteId: string | null;
@@ -530,6 +531,30 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     setMenuOpen(false);
   };
 
+  const handleExportNotePDF = async () => {
+    if (!currentNoteId) return;
+    const note = getNoteById(currentNoteId);
+    if (!note) return;
+
+    setMenuOpen(false);
+    
+    try {
+      await exportToPDF(note.title, note.content);
+      setToast({
+        isOpen: true,
+        message: 'PDF exported successfully!',
+        type: 'success',
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      setToast({
+        isOpen: true,
+        message: 'Failed to export PDF. Please try again.',
+        type: 'error',
+      });
+    }
+  };
+
   const handleExportAllMarkdown = async () => {
     const notes = getNotes();
     if (notes.length === 0) {
@@ -859,6 +884,13 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
                         <span>Export Note (Markdown)</span>
                       </button>
                       <button
+                        onClick={handleExportNotePDF}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-left text-theme-text-primary hover:bg-theme-bg-primary hover:text-white transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Export Note (PDF)</span>
+                      </button>
+                      <button
                         onClick={handleDeleteNote}
                         className="w-full flex items-center gap-2 px-4 py-2 text-left text-red-400 hover:bg-theme-bg-primary hover:text-red-300 transition-colors"
                       >
@@ -1130,7 +1162,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
             <div className="px-6 py-6 space-y-6">
               <div>
                 <label className="block text-sm font-medium text-theme-text-primary mb-3">Select existing flow</label>
-                <div className="max-h-48 overflow-y-auto border border-theme-border rounded-lg bg-theme-bg-darkest">
+                <div className="max-h-48 overflow-y-auto scrollbar-hide border border-theme-border rounded-lg bg-theme-bg-darkest">
                   {flows.length > 0 ? (
                     flows.map((flow) => (
                       <button

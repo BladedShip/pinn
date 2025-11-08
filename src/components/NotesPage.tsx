@@ -877,7 +877,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                             value={note.folder && note.folder.trim() ? note.folder : 'Unfiled'}
                             onChange={(e) => handleAssignFolder(note.id, e.target.value)}
                             title={note.folder || 'Unfiled'}
-                            className="text-sm bg-theme-bg-primary border border-theme-border rounded px-2 py-1 text-theme-text-primary max-w-[200px]"
+                            className="text-xs bg-[#2a3038]/30 border border-[#3a4048]/50 hover:border-[#3a4048] rounded px-2 py-1 text-theme-text-secondary hover:text-theme-text-primary max-w-[200px] transition-all hover:bg-[#2a3038]/50 focus:bg-[#2a3038]/50 focus:border-[#3a4048] focus:outline-none"
                           >
                             <option value="Unfiled">Unfiled</option>
                             {folders.filter((f) => f !== 'All' && f !== 'Unfiled').map((f) => (
