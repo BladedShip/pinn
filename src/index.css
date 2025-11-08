@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove all default focus outlines and rings */
+*:focus,
+*:focus-visible,
+*:active,
+button:focus,
+button:focus-visible,
+button:active {
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  outline-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+button::-moz-focus-inner {
+  border: 0;
+}
+
 /* Theme CSS Variables */
 :root[data-theme="default"] {
   --color-bg-primary: #2c3440;

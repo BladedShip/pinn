@@ -183,16 +183,17 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
                   <button
                     key={category.id}
                     onClick={() => setActiveCategory(category.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                    className={`w-full flex items-start gap-3 px-4 py-3 rounded-lg transition-all focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none ${
                       isActive
-                        ? 'bg-theme-bg-secondary text-theme-text-primary border border-theme-border'
+                        ? 'bg-theme-bg-secondary text-theme-text-primary'
                         : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-bg-primary'
                     }`}
+                    style={{ outline: 'none', boxShadow: 'none' }}
                   >
-                    <Icon className="w-5 h-5 flex-shrink-0 text-theme-text-secondary" />
-                    <div className="flex flex-col items-start flex-1 min-w-0">
-                      <span className="text-sm font-medium">{category.label}</span>
-                      <span className="text-xs opacity-75 truncate w-full">{category.description}</span>
+                    <Icon className="w-5 h-5 flex-shrink-0 text-theme-text-secondary mt-0.5" />
+                    <div className="flex flex-col flex-1 min-w-0 gap-1">
+                      <span className="text-sm font-medium text-left block">{category.label}</span>
+                      <span className="text-xs text-theme-text-tertiary text-left block leading-tight">{category.description}</span>
                     </div>
                   </button>
                 );
@@ -374,7 +375,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
                       {/* Default Theme */}
                       <button
                         onClick={() => setSelectedTheme('default')}
-                        className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                        className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${
                           selectedTheme === 'default'
                             ? 'border-theme-accent bg-theme-accent/10'
                             : 'border-theme-border bg-theme-bg-darkest hover:border-theme-border'
@@ -401,7 +402,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
                       {/* Darker Theme */}
                       <button
                         onClick={() => setSelectedTheme('darker')}
-                        className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                        className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${
                           selectedTheme === 'darker'
                             ? 'border-theme-accent bg-theme-accent/10'
                             : 'border-theme-border bg-theme-bg-darkest hover:border-theme-border'
