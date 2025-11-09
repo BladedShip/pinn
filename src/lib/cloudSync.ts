@@ -375,22 +375,43 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
       if (response && response.ok) {
         const data = await response.json();
         
+        // Handle null response (file doesn't exist)
+        if (data === null) {
+          console.log(`File ${dbName} not found in Realtime Database (null response)`);
+          continue;
+        }
+        
         // Extract content from Realtime Database structure
-        if (data && data.content !== undefined) {
-          const fileName = `${dbName}.json`;
-          // If content is an object, stringify it; otherwise use as-is
-          downloadedFiles[fileName] = typeof data.content === 'string' 
+        // Data might be stored as { content: ..., fileName: ..., lastUpdated: ... }
+        // or directly as the content itself
+        let fileContent: string | null = null;
+        
+        if (data && typeof data === 'object' && data.content !== undefined) {
+          // Wrapped structure: { content: ..., fileName: ..., lastUpdated: ... }
+          fileContent = typeof data.content === 'string' 
             ? data.content 
             : JSON.stringify(data.content);
+        } else if (data !== null && data !== undefined) {
+          // Direct content (legacy format or direct storage)
+          fileContent = typeof data === 'string' 
+            ? data 
+            : JSON.stringify(data);
+        }
+        
+        if (fileContent !== null) {
+          const fileName = `${dbName}.json`;
+          downloadedFiles[fileName] = fileContent;
           
           downloadedCount++;
           if (onProgress) {
             onProgress(Math.round((downloadedCount / files.length) * 100));
           }
+        } else {
+          console.warn(`File ${dbName} downloaded but content could not be extracted. Data structure:`, typeof data, data);
         }
       } else if (response?.status === 404) {
         // File doesn't exist in cloud, skip
-        console.log(`File ${dbName} not found in Realtime Database`);
+        console.log(`File ${dbName} not found in Realtime Database (404)`);
       } else {
         console.warn(`Could not download ${dbName}: ${response?.status || 'network error'}`);
       }
@@ -405,10 +426,8 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
     }
   }
 
-  if (Object.keys(downloadedFiles).length === 0) {
-    throw new Error('No data found in Realtime Database. Make sure you have synced to cloud at least once.');
-  }
-
+  // Return whatever files were found, even if empty
+  // This allows downloading partial data or handling empty cloud storage gracefully
   return downloadedFiles;
 }
 
