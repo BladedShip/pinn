@@ -164,8 +164,10 @@ export async function uploadToCloud(config: CloudConfig, onProgress?: (percent: 
 
   // Create a timestamp for this sync
   const timestamp = new Date().toISOString();
-  // Use a fixed path for personal cloud sync (not per-user, so all devices can access the same data)
-  const dataPath = 'data';
+  // Use user-based path for now (backward compatibility with existing data)
+  // TODO: Migrate to fixed 'data' path once database rules are updated
+  const userId = getUserId();
+  const dataPath = `users/${userId}`;
 
   // Upload each file to Realtime Database
   let uploadedCount = 0;
@@ -281,7 +283,8 @@ export async function uploadToCloud(config: CloudConfig, onProgress?: (percent: 
 
   // Save sync metadata
   try {
-    const dataPath = 'data';
+    const userId = getUserId();
+    const dataPath = `users/${userId}`;
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const metadataUrls = [
       ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`),
@@ -376,11 +379,15 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
           
           if (response.ok) {
             const data = await response.json();
+            console.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, keys: ${data && typeof data === 'object' ? Object.keys(data).join(',') : 'N/A'}`);
             // Only consider it successful if we got actual data (not null)
             if (data !== null) {
               successfulUrl = url;
               downloadedData = data;
-              break; // Success
+              console.log(`Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+              break; // Success - exit the loop
+            } else {
+              console.log(`Data for ${dbName} is null, continuing to next URL`);
             }
           } else if (response.status === 401 || response.status === 403) {
             // Try without auth
@@ -390,10 +397,12 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
             console.log(`Public response for ${dbName}: status=${response.status}, ok=${response.ok}`);
             if (response.ok) {
               const data = await response.json();
+              console.log(`Got public data for ${dbName}, type: ${typeof data}, isNull: ${data === null}`);
               if (data !== null) {
                 successfulUrl = publicUrl;
                 downloadedData = data;
-                break; // Success with public access
+                console.log(`Successfully found ${dbName} at public URL`);
+                break; // Success with public access - exit the loop
               }
             }
           }
