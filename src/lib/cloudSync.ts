@@ -164,7 +164,8 @@ export async function uploadToCloud(config: CloudConfig, onProgress?: (percent: 
 
   // Create a timestamp for this sync
   const timestamp = new Date().toISOString();
-  const userId = getUserId(); // Get or create a unique user ID
+  // Use a fixed path for personal cloud sync (not per-user, so all devices can access the same data)
+  const dataPath = 'data';
 
   // Upload each file to Realtime Database
   let uploadedCount = 0;
@@ -182,9 +183,9 @@ export async function uploadToCloud(config: CloudConfig, onProgress?: (percent: 
       const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
       const urlFormats = [
         // Try with common regions first (most likely to work)
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users/${userId}/${dbName}.json`),
+        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json`),
         // Fallback to old format
-        `https://${config.projectId}.firebaseio.com/users/${userId}/${dbName}.json`,
+        `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json`,
       ];
       
       // Parse the content to ensure it's valid JSON
@@ -280,10 +281,11 @@ export async function uploadToCloud(config: CloudConfig, onProgress?: (percent: 
 
   // Save sync metadata
   try {
+    const dataPath = 'data';
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const metadataUrls = [
-      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users/${userId}/_metadata.json?auth=${config.apiKey}`),
-      `https://${config.projectId}.firebaseio.com/users/${userId}/_metadata.json?auth=${config.apiKey}`,
+      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`),
+      `https://${config.projectId}.firebaseio.com/${dataPath}/_metadata.json?auth=${config.apiKey}`,
     ];
     
     for (const url of metadataUrls) {
@@ -335,7 +337,12 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
     throw new Error('Cloud configuration is incomplete');
   }
 
-  const userId = getUserId();
+  // Use a fixed path for personal cloud sync (not per-user, so all devices can access the same data)
+  // Also check old user-based path for backward compatibility
+  const dataPath = 'data';
+  const userId = getUserId(); // For backward compatibility with old data
+  console.log(`Downloading from path: ${dataPath} (also checking old path: users/${userId}), projectId: ${config.projectId}`);
+  
   const files = ['notes', 'folders', 'flows', 'flowCategories', 'theme', 'cloudConfig']; // Without .json extension
   const downloadedFiles: { [key: string]: string } = {};
   
@@ -345,41 +352,61 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
     try {
       // Use Firebase Realtime Database REST API
       // Try different URL formats with common regions
+      // First try new fixed path, then old user-based path for backward compatibility
       const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
       const downloadUrls = [
+        // New fixed path (preferred)
+        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json?auth=${config.apiKey}`),
+        `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json?auth=${config.apiKey}`,
+        // Old user-based path (backward compatibility)
         ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users/${userId}/${dbName}.json?auth=${config.apiKey}`),
         `https://${config.projectId}.firebaseio.com/users/${userId}/${dbName}.json?auth=${config.apiKey}`,
       ];
       
       let response: Response | null = null;
+      let successfulUrl: string | null = null;
       
       // Try each URL format
+      let downloadedData: any = null;
       for (const url of downloadUrls) {
         try {
+          console.log(`Trying to download ${dbName} from: ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
           response = await fetch(url);
+          console.log(`Response for ${dbName}: status=${response.status}, ok=${response.ok}`);
+          
           if (response.ok) {
-            break; // Success
+            const data = await response.json();
+            // Only consider it successful if we got actual data (not null)
+            if (data !== null) {
+              successfulUrl = url;
+              downloadedData = data;
+              break; // Success
+            }
           } else if (response.status === 401 || response.status === 403) {
             // Try without auth
             const publicUrl = url.replace('?auth=' + config.apiKey, '');
+            console.log(`Trying without auth: ${publicUrl}`);
             response = await fetch(publicUrl);
+            console.log(`Public response for ${dbName}: status=${response.status}, ok=${response.ok}`);
             if (response.ok) {
-              break; // Success with public access
+              const data = await response.json();
+              if (data !== null) {
+                successfulUrl = publicUrl;
+                downloadedData = data;
+                break; // Success with public access
+              }
             }
           }
-        } catch {
+        } catch (err) {
+          console.log(`Error fetching ${url}:`, err);
           continue; // Try next URL
         }
       }
-
-      if (response && response.ok) {
-        const data = await response.json();
+      
+      if (successfulUrl && downloadedData !== null) {
+        console.log(`Successfully connected to ${dbName} at: ${successfulUrl.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
         
-        // Handle null response (file doesn't exist)
-        if (data === null) {
-          console.log(`File ${dbName} not found in Realtime Database (null response)`);
-          continue;
-        }
+        const data = downloadedData;
         
         // Debug: Log the actual data structure received
         console.log(`Downloaded ${dbName}:`, {
@@ -421,6 +448,9 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
       } else if (response?.status === 404) {
         // File doesn't exist in cloud, skip
         console.log(`File ${dbName} not found in Realtime Database (404)`);
+      } else if (!successfulUrl) {
+        // No successful URL found
+        console.log(`File ${dbName} not found in Realtime Database (tried all URL formats)`);
       } else {
         console.warn(`Could not download ${dbName}: ${response?.status || 'network error'}`);
       }
@@ -509,11 +539,11 @@ export async function validateCloudConfig(config: CloudConfig): Promise<boolean>
     }
 
     // Try to access Realtime Database to verify configuration
-    const userId = getUserId();
+    const dataPath = 'data';
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const testUrls = [
-      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users/${userId}/_metadata.json?auth=${config.apiKey}`),
-      `https://${config.projectId}.firebaseio.com/users/${userId}/_metadata.json?auth=${config.apiKey}`,
+      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`),
+      `https://${config.projectId}.firebaseio.com/${dataPath}/_metadata.json?auth=${config.apiKey}`,
     ];
     
     // Try each URL format
