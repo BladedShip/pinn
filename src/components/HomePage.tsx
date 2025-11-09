@@ -122,7 +122,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
         (flow) =>
           flow.title.toLowerCase().includes(query) ||
           flow.tags?.some((tag) => tag.toLowerCase().includes(query)) ||
-          flow.nodes.some((node) => node.data.label.toLowerCase().includes(query))
+          flow.nodes?.some((node) => node.data.label.toLowerCase().includes(query))
       );
     }
 
@@ -475,7 +475,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
                           <div className="flex items-center gap-2.5 flex-wrap text-xs text-gray-500">
                             <span className="whitespace-nowrap">{formatDate(flow.created_at)}</span>
                             <span className="px-2 py-0.5 bg-theme-bg-primary rounded-md border border-gray-600 text-theme-text-secondary whitespace-nowrap">
-                              {flow.nodes.length} node{flow.nodes.length !== 1 ? 's' : ''}
+                              {flow.nodes?.length || 0} node{(flow.nodes?.length || 0) !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>
@@ -537,7 +537,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
               <div className="flex flex-col items-center justify-center py-24 px-4">
                 <div className="relative mb-8">
                   <div className="absolute inset-0 bg-gradient-to-br from-[#e8935f]/10 to-transparent rounded-2xl blur-xl"></div>
-                  <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3a4450] to-[#2c3440] border border-theme-border/50 flex items-center justify-center">
+                  <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3a4450] to-[#2c3440] flex items-center justify-center">
                     <Sparkles className="w-12 h-12 text-[#e8935f] opacity-80" />
                   </div>
                 </div>

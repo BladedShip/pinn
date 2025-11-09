@@ -49,6 +49,25 @@ const STORAGE_KEY = 'pinn.flows';
 const CATEGORIES_KEY = 'pinn.flowCategories';
 
 /**
+ * Normalize a flow to ensure it has all required properties
+ */
+function normalizeFlow(flow: any): Flow {
+  return {
+    ...flow,
+    nodes: Array.isArray(flow.nodes) ? flow.nodes : [],
+    edges: Array.isArray(flow.edges) ? flow.edges : [],
+    tags: Array.isArray(flow.tags) ? flow.tags : [],
+  };
+}
+
+/**
+ * Normalize an array of flows
+ */
+function normalizeFlows(flows: any[]): Flow[] {
+  return flows.map(normalizeFlow);
+}
+
+/**
  * Initialize flows storage - load data from file system or localStorage
  */
 async function initialize(): Promise<void> {
@@ -82,10 +101,10 @@ async function initialize(): Promise<void> {
         
         // Only update cache if we got valid data (array, even if empty)
         if (Array.isArray(loadedFlows)) {
-          flowsCache = loadedFlows;
+          flowsCache = normalizeFlows(loadedFlows);
         } else {
           console.warn('Invalid flows data loaded, keeping existing cache or empty array');
-          flowsCache = flowsCache || [];
+          flowsCache = flowsCache ? normalizeFlows(flowsCache) : [];
         }
         
         if (Array.isArray(loadedCategories)) {
@@ -103,7 +122,8 @@ async function initialize(): Promise<void> {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) {
             const parsed = JSON.parse(raw);
-            flowsCache = Array.isArray(parsed) ? parsed as Flow[] : [];
+            const flows = Array.isArray(parsed) ? parsed : [];
+            flowsCache = normalizeFlows(flows);
           } else {
             flowsCache = [];
           }
@@ -196,14 +216,16 @@ function readAll(): Flow[] {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed as Flow[] : [];
+        const flows = Array.isArray(parsed) ? parsed : [];
+        return normalizeFlows(flows);
       }
     } catch {
       // ignore
     }
     return [];
   }
-  return flowsCache || [];
+  const flows = flowsCache || [];
+  return normalizeFlows(flows);
 }
 
 /**

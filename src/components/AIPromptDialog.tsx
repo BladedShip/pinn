@@ -108,7 +108,7 @@ export default function AIPromptDialog({
       return;
     }
 
-    const apiKey = getGeminiApiKey();
+    const apiKey = await getGeminiApiKey();
     if (!apiKey) {
       setError('Please set your Gemini API key in Settings first');
       if (onOpenSettings) {

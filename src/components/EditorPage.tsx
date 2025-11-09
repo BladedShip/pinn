@@ -136,7 +136,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
       const flowsContainingNote: { flowId: string; flowTitle: string }[] = [];
       
       for (const flow of allFlows) {
-        const node = flow.nodes.find((n) => n.noteId === currentNoteId);
+        const node = flow.nodes?.find((n) => n.noteId === currentNoteId);
         if (node) {
           flowsContainingNote.push({ flowId: flow.id, flowTitle: flow.title });
         }

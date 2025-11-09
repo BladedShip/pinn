@@ -140,7 +140,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
         (flow) =>
           flow.title.toLowerCase().includes(query) ||
           flow.tags?.some((tag) => tag.toLowerCase().includes(query)) ||
-          flow.nodes.some((node) => node.data.label.toLowerCase().includes(query))
+          flow.nodes?.some((node) => node.data.label.toLowerCase().includes(query))
       );
     }
 
@@ -477,7 +477,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                         (flow) =>
                           flow.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           flow.tags?.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          flow.nodes.some((node) => node.data.label.toLowerCase().includes(searchQuery.toLowerCase()))
+                          flow.nodes?.some((node) => node.data.label.toLowerCase().includes(searchQuery.toLowerCase()))
                       )
                     : categoryFlows;
 
@@ -623,8 +623,8 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                           </h4>
                           <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
                             <span>{formatDate(flow.updated_at)}</span>
-                            <span>{flow.nodes.length} node{flow.nodes.length !== 1 ? 's' : ''}</span>
-                            <span>{flow.edges.length} connection{flow.edges.length !== 1 ? 's' : ''}</span>
+                            <span>{flow.nodes?.length || 0} node{(flow.nodes?.length || 0) !== 1 ? 's' : ''}</span>
+                            <span>{flow.edges?.length || 0} connection{(flow.edges?.length || 0) !== 1 ? 's' : ''}</span>
                           </div>
                           {flow.tags && flow.tags.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-2 mb-2">
