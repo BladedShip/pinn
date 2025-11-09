@@ -340,11 +340,43 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
     throw new Error('Cloud configuration is incomplete');
   }
 
-  // Use a fixed path for personal cloud sync (not per-user, so all devices can access the same data)
-  // Also check old user-based path for backward compatibility
-  const dataPath = 'data';
-  const userId = getUserId(); // For backward compatibility with old data
-  console.log(`Downloading from path: ${dataPath} (also checking old path: users/${userId}), projectId: ${config.projectId}`);
+  // First, try to discover what data exists in the database
+  // Check the users/ path to find any existing user IDs with data
+  const userId = getUserId();
+  console.log(`Downloading from database, projectId: ${config.projectId}`);
+  
+  // Try to list all users in the database to find where data is stored
+  const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
+  let foundUserPath: string | null = null;
+  
+  // Try to access the users/ path to see what's there
+  for (const region of commonRegions) {
+    try {
+      const usersUrl = `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users.json?auth=${config.apiKey}`;
+      const response = await fetch(usersUrl);
+      if (response.ok) {
+        const usersData = await response.json();
+        if (usersData && typeof usersData === 'object' && usersData !== null) {
+          // Find the first user ID that has data
+          const userIds = Object.keys(usersData);
+          if (userIds.length > 0) {
+            foundUserPath = `users/${userIds[0]}`;
+            console.log(`Found data at path: ${foundUserPath}`);
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      // Try next region
+      continue;
+    }
+  }
+  
+  // If we didn't find a user path, try the current user's path
+  if (!foundUserPath) {
+    foundUserPath = `users/${userId}`;
+    console.log(`Using current user path: ${foundUserPath}`);
+  }
   
   const files = ['notes', 'folders', 'flows', 'flowCategories', 'theme', 'cloudConfig']; // Without .json extension
   const downloadedFiles: { [key: string]: string } = {};
@@ -355,15 +387,10 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
     try {
       // Use Firebase Realtime Database REST API
       // Try different URL formats with common regions
-      // First try new fixed path, then old user-based path for backward compatibility
-      const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
+      // Use the found path (or current user path)
       const downloadUrls = [
-        // New fixed path (preferred)
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json?auth=${config.apiKey}`),
-        `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json?auth=${config.apiKey}`,
-        // Old user-based path (backward compatibility)
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users/${userId}/${dbName}.json?auth=${config.apiKey}`),
-        `https://${config.projectId}.firebaseio.com/users/${userId}/${dbName}.json?auth=${config.apiKey}`,
+        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${dbName}.json?auth=${config.apiKey}`),
+        `https://${config.projectId}.firebaseio.com/${foundUserPath}/${dbName}.json?auth=${config.apiKey}`,
       ];
       
       let response: Response | null = null;
@@ -379,15 +406,16 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
           
           if (response.ok) {
             const data = await response.json();
-            console.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, keys: ${data && typeof data === 'object' ? Object.keys(data).join(',') : 'N/A'}`);
-            // Only consider it successful if we got actual data (not null)
-            if (data !== null) {
+            console.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, isEmpty: ${data && typeof data === 'object' && Object.keys(data).length === 0}, keys: ${data && typeof data === 'object' && data !== null ? Object.keys(data).join(',') : 'N/A'}`);
+            // Accept any response that's not null - even empty objects might contain data in nested structure
+            // Also accept if it's an object (even if it appears empty, it might have nested data)
+            if (data !== null && data !== undefined) {
               successfulUrl = url;
               downloadedData = data;
               console.log(`Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
               break; // Success - exit the loop
             } else {
-              console.log(`Data for ${dbName} is null, continuing to next URL`);
+              console.log(`Data for ${dbName} is null/undefined, continuing to next URL`);
             }
           } else if (response.status === 401 || response.status === 403) {
             // Try without auth
@@ -430,13 +458,21 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
         // or directly as the content itself
         let fileContent: string | null = null;
         
-        if (data && typeof data === 'object' && data.content !== undefined) {
-          // Wrapped structure: { content: ..., fileName: ..., lastUpdated: ... }
-          fileContent = typeof data.content === 'string' 
-            ? data.content 
-            : JSON.stringify(data.content);
+        if (data && typeof data === 'object' && data !== null) {
+          if (data.content !== undefined) {
+            // Wrapped structure: { content: ..., fileName: ..., lastUpdated: ... }
+            fileContent = typeof data.content === 'string' 
+              ? data.content 
+              : JSON.stringify(data.content);
+          } else if (Object.keys(data).length > 0) {
+            // Direct object content - stringify the whole object
+            fileContent = JSON.stringify(data);
+          } else {
+            // Empty object - might be valid (empty array/object in JSON)
+            fileContent = JSON.stringify(data);
+          }
         } else if (data !== null && data !== undefined) {
-          // Direct content (legacy format or direct storage)
+          // Direct content (string or other primitive)
           fileContent = typeof data === 'string' 
             ? data 
             : JSON.stringify(data);
