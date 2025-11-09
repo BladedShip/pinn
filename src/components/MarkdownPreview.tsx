@@ -3,13 +3,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Book } from 'lucide-react';
 
 interface MarkdownPreviewProps {
   content: string;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
-export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownPreviewProps) {
   const [copiedCodeBlocks, setCopiedCodeBlocks] = useState<Set<number>>(new Set());
   
   const handleCopyCode = async (code: string, index: number) => {
@@ -26,6 +27,13 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
     } catch (err) {
       console.error('Failed to copy code:', err);
     }
+  };
+
+  // Parse note references and replace with React components
+  const parseNoteReferences = (text: string): string => {
+    if (!text) return text;
+    // For now, just return the text as-is since we'll handle it in the custom renderer
+    return text;
   };
 
   // Aggressively merge URLs into the same paragraph as surrounding text
@@ -208,11 +216,107 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
             return <pre {...props}>{children}</pre>;
           },
           p({ node, children, ...props }: any) {
-            // Check if paragraph contains only a link
-            const hasOnlyLink = node.children?.length === 1 && node.children[0].type === 'link';
+            // Parse paragraph text to detect note references
+            const parseContent = (children: any): any => {
+              if (typeof children === 'string') {
+                const noteRefPattern = /\[\[note:([^\]|]+)\|([^\]]+)\]\]/g;
+                const parts: any[] = [];
+                let lastIndex = 0;
+                let match;
+
+                while ((match = noteRefPattern.exec(children)) !== null) {
+                  // Add text before the match
+                  if (match.index > lastIndex) {
+                    parts.push(children.substring(lastIndex, match.index));
+                  }
+
+                  // Add note reference component
+                  const noteId = match[1];
+                  const noteTitle = match[2];
+                  parts.push(
+                    <span
+                      key={`note-ref-${match.index}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onNavigateToNote) {
+                          onNavigateToNote(noteId);
+                        }
+                      }}
+                      className="note-reference-tag"
+                      title={`Click to open: ${noteTitle}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        cursor: onNavigateToNote ? 'pointer' : 'default',
+                        backgroundColor: 'rgba(232, 147, 95, 0.15)',
+                        color: 'rgb(232, 147, 95)',
+                        border: '1px solid rgba(232, 147, 95, 0.4)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875em',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease',
+                        margin: '0 0.2rem',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'middle',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onNavigateToNote) {
+                          const target = e.currentTarget as HTMLElement;
+                          target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
+                          target.style.borderColor = 'rgba(232, 147, 95, 0.6)';
+                          target.style.transform = 'translateY(-1px)';
+                          target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const target = e.currentTarget as HTMLElement;
+                        target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
+                        target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
+                        target.style.transform = 'translateY(0)';
+                        target.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Book style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }} />
+                      {noteTitle}
+                    </span>
+                  );
+
+                  lastIndex = match.index + match[0].length;
+                }
+
+                // Add remaining text
+                if (lastIndex < children.length) {
+                  parts.push(children.substring(lastIndex));
+                }
+
+                return parts.length > 0 ? parts : children;
+              }
+
+              // Handle array of children
+              if (Array.isArray(children)) {
+                return children.map((child, index) => {
+                  if (typeof child === 'string') {
+                    return parseContent(child);
+                  }
+                  // If it's a text node object
+                  if (child?.props?.node?.type === 'text' && child?.props?.node?.value) {
+                    return parseContent(child.props.node.value);
+                  }
+                  return child;
+                });
+              }
+
+              return children;
+            };
+
+            const parsedChildren = parseContent(children);
+
             return (
               <p {...props} style={{ display: 'block', margin: '0 0 1rem 0' }}>
-                {children}
+                {parsedChildren}
               </p>
             );
           },

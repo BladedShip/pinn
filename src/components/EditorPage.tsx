@@ -24,6 +24,7 @@ import {
   Book,
   Settings,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { getNoteById, saveNote, createNote, deleteNote, getNotes, writeAll, getAllFolders, setNoteFolder } from '../lib/storage';
 import { getFlows, createFlow, addNoteToFlow, Flow, getFlowsContainingNote } from '../lib/flowStorage';
@@ -34,6 +35,7 @@ import Toast from './Toast';
 import SettingsDialog from './SettingsDialog';
 import AIPromptDialog from './AIPromptDialog';
 import AIComparisonDialog from './AIComparisonDialog';
+import NoteReferenceModal from './NoteReferenceModal';
 import JSZip from 'jszip';
 import { exportToPDF } from '../lib/pdfExport';
 
@@ -42,9 +44,10 @@ interface EditorPageProps {
   onNavigateToHome: () => void;
   onNavigateToFlows: () => void;
   onNavigateToNotes: () => void;
+  onNavigateToEditor?: (noteId: string) => void;
 }
 
-export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows, onNavigateToNotes }: EditorPageProps) {
+export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows, onNavigateToNotes, onNavigateToEditor }: EditorPageProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [editorMode, setEditorMode] = useState<'markdown' | 'preview'>(noteId ? 'preview' : 'markdown');
@@ -80,6 +83,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     startPos: number;
     endPos: number;
   } | null>(null);
+  const [showNoteReferenceModal, setShowNoteReferenceModal] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const flowButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -813,6 +817,45 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     // No toast needed for rejection
   };
 
+  const handleSelectNoteReference = (noteId: string, noteTitle: string) => {
+    const textarea = editorRef.current;
+    if (!textarea) return;
+
+    // Insert note reference using custom syntax: [[note:noteId|noteTitle]]
+    const noteReference = `[[note:${noteId}|${noteTitle}]]`;
+    
+    // Use execCommand to make it undoable
+    textarea.focus();
+    const start = textarea.selectionStart ?? content.length;
+    const end = textarea.selectionEnd ?? content.length;
+    
+    // Delete selection if any
+    if (start !== end) {
+      textarea.setSelectionRange(start, end);
+      document.execCommand('delete', false);
+    }
+    
+    // Insert note reference
+    document.execCommand('insertText', false, noteReference);
+    
+    // Update React state to stay in sync
+    const newContent = textarea.value;
+    setContent(newContent);
+    
+    // Move cursor after inserted reference
+    const cursorPos = textarea.selectionStart;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursorPos, cursorPos);
+    });
+
+    setToast({
+      isOpen: true,
+      message: `Note reference to "${noteTitle}" inserted!`,
+      type: 'success',
+    });
+  };
+
   return (
     <div className="h-screen bg-theme-bg-primary flex flex-col overflow-hidden">
       <header className="flex-shrink-0 bg-theme-bg-primary flex items-center justify-between px-6 py-4 border-b border-theme-border">
@@ -1099,15 +1142,19 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
               <button onClick={() => insertAtCursor('![alt text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
                 <Image className="w-5 h-5" />
               </button>
-              <button onClick={() => insertAtCursor('[link text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => insertAtCursor('[link text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Insert Link">
                 <Link className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => wrapSelection('`')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => wrapSelection('`')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Inline Code">
                 <Code className="w-5 h-5" />
               </button>
-              <button onClick={() => wrapSelection('\n```\n', '\n```\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => wrapSelection('\n```\n', '\n```\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Code Block">
                 <Code2 className="w-5 h-5" />
+              </button>
+              <div className="w-px h-6 bg-gray-700 mx-2" />
+              <button onClick={() => setShowNoteReferenceModal(true)} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Reference Note">
+                <Book className="w-5 h-5" />
               </button>
             </div>
           )}
@@ -1129,7 +1176,10 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
                 readOnly={false}
               />
             ) : (
-              <MarkdownPreview content={content} />
+              <MarkdownPreview 
+                content={content} 
+                onNavigateToNote={onNavigateToEditor}
+              />
             )}
           </div>
           <style>{`
@@ -1338,6 +1388,13 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
           </div>
         </div>
       )}
+
+      <NoteReferenceModal
+        isOpen={showNoteReferenceModal}
+        onClose={() => setShowNoteReferenceModal(false)}
+        onSelectNote={handleSelectNoteReference}
+        currentNoteId={currentNoteId}
+      />
     </div>
   );
 }

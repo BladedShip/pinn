@@ -102,14 +102,14 @@ function applyBasicSyntaxHighlighting(code: string): Array<{ text: string; color
 
 /**
  * Parse inline markdown to text segments with formatting
- * Now includes links and images
+ * Now includes links, images, and note references
  */
 function parseInlineMarkdown(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let currentPos = 0;
   
-  // Pattern to match: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), ![image](url)
-  const pattern = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|~~([^~]+)~~|!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\))/g;
+  // Pattern to match: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), ![image](url), [[note:id|title]]
+  const pattern = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|~~([^~]+)~~|!\[([^\]]*)\]\(([^)]+)\)|\[\[note:([^\]|]+)\|([^\]]+)\]\]|\[([^\]]+)\]\(([^)]+)\))/g;
   
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
@@ -139,14 +139,25 @@ function parseInlineMarkdown(text: string): TextSegment[] {
         isImage: true,
       });
     } else if (match[8] && match[9]) {
+      // [[note:id|title]] - note reference
+      // Render as "Note referred: noteTitle " in monospace font with accent color
+      segments.push({
+        text: ` Note referred: ${match[9]} `,
+        bold: false,
+        italic: false,
+        code: false, // Don't use code styling
+        strikethrough: false,
+        link: `note:${match[8]}`, // Store note ID in link field for special rendering
+      });
+    } else if (match[10] && match[11]) {
       // [text](url) - link - show just the link text (no URL in parentheses)
       segments.push({
-        text: match[8].trim(), // Trim any extra spaces
+        text: match[10].trim(), // Trim any extra spaces
         bold: false,
         italic: false,
         code: false,
         strikethrough: false,
-        link: match[9],
+        link: match[11],
       });
     } else if (match[2]) {
       // **bold**
@@ -512,47 +523,70 @@ export async function exportToPDF(title: string, content: string, filename?: str
       }
       
       // Render text
-      const width = pdf.getTextWidth(segment.text);
+      let width: number;
       
-      // Render text (links show URL in parentheses)
-      if (segment.link) {
-        // Set color and font right before rendering to ensure it's applied
-        pdf.setTextColor(80, 120, 160); // Muted blue-gray - less prominent
-        if (segment.bold && segment.italic) {
-          pdf.setFont('helvetica', 'bolditalic');
-        } else if (segment.bold) {
-          pdf.setFont('helvetica', 'bold');
-        } else if (segment.italic) {
-          pdf.setFont('helvetica', 'italic');
-        } else {
-          pdf.setFont('helvetica', 'normal'); // Links not bold by default
+      // Special handling for note references - use monospace and accent color
+      if (segment.link && segment.link.startsWith('note:')) {
+        // Note reference: use monospace font and accent color
+        pdf.setFont('courier', 'normal');
+        pdf.setTextColor(232, 147, 95); // Accent color
+        pdf.setFontSize(fontSize * 0.95); // Slightly smaller for monospace
+        
+        width = pdf.getTextWidth(segment.text);
+        pdf.text(segment.text, x, y);
+        
+        // Add strikethrough if needed
+        if (segment.strikethrough) {
+          pdf.setDrawColor(0, 0, 0);
+          pdf.setLineWidth(0.2);
+          pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
         }
         
-        // Render text with blue color first
-        pdf.text(segment.text, x, y);
-        
-        // Then add the clickable link area on top
-        const textHeight = fontSize * 0.35277778;
-        pdf.link(x, y - textHeight, width, textHeight, { url: segment.link });
-        
-        // Add subtle underline
-        // In jsPDF, y is the baseline, so underline should be slightly below
-        pdf.setDrawColor(80, 120, 160); // Muted blue-gray to match link color
-        pdf.setLineWidth(0.3); // Thinner underline for subtlety
-        const underlineY = y + 1.5; // Position underline below baseline
-        pdf.line(x, underlineY, x + width, underlineY);
+        x += width;
       } else {
-        pdf.text(segment.text, x, y);
+        // Regular rendering for non-note-reference segments
+        width = pdf.getTextWidth(segment.text);
+        
+        // Render text (links show URL in parentheses)
+        if (segment.link) {
+          // Regular link
+          pdf.setTextColor(80, 120, 160); // Muted blue-gray for regular links
+          
+          if (segment.bold && segment.italic) {
+            pdf.setFont('helvetica', 'bolditalic');
+          } else if (segment.bold) {
+            pdf.setFont('helvetica', 'bold');
+          } else if (segment.italic) {
+            pdf.setFont('helvetica', 'italic');
+          } else {
+            pdf.setFont('helvetica', 'normal');
+          }
+          
+          // Render text
+          pdf.text(segment.text, x, y);
+          
+          // Add clickable area and underline
+          const textHeight = fontSize * 0.35277778;
+          pdf.link(x, y - textHeight, width, textHeight, { url: segment.link });
+          
+          // Add subtle underline
+          pdf.setDrawColor(80, 120, 160); // Muted blue-gray to match link color
+          pdf.setLineWidth(0.3); // Thinner underline for subtlety
+          const underlineY = y + 1.5; // Position underline below baseline
+          pdf.line(x, underlineY, x + width, underlineY);
+        } else {
+          pdf.text(segment.text, x, y);
+        }
+        
+        // Add strikethrough if needed
+        if (segment.strikethrough) {
+          pdf.setDrawColor(0, 0, 0);
+          pdf.setLineWidth(0.2);
+          pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
+        }
+        
+        x += width;
       }
-      
-      // Add strikethrough if needed
-      if (segment.strikethrough) {
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.2);
-        pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
-      }
-      
-      x += width;
     }
   };
 
@@ -574,17 +608,24 @@ export async function exportToPDF(title: string, content: string, filename?: str
       } else {
         pdf.setFontSize(fontSize);
         
-        // Handle links in quotes - make them blue but not bold
+        // Handle links in quotes - check if it's a note reference or regular link
         if (segment.link) {
-          pdf.setTextColor(80, 120, 160); // Muted blue-gray for links
-          if (segment.bold && segment.italic) {
-            pdf.setFont('helvetica', 'bolditalic');
-          } else if (segment.bold) {
-            pdf.setFont('helvetica', 'bold');
-          } else if (segment.italic) {
-            pdf.setFont('helvetica', 'italic'); // Just italic for link in quote
+          const isNoteReference = segment.link.startsWith('note:');
+          if (isNoteReference) {
+            pdf.setFont('courier', 'normal'); // Monospace for note references
+            pdf.setTextColor(232, 147, 95); // Accent color for note references
           } else {
-            pdf.setFont('helvetica', 'normal'); // Links not bold by default
+            pdf.setTextColor(80, 120, 160); // Muted blue-gray for regular links
+            
+            if (segment.bold && segment.italic) {
+              pdf.setFont('helvetica', 'bolditalic');
+            } else if (segment.bold) {
+              pdf.setFont('helvetica', 'bold');
+            } else if (segment.italic) {
+              pdf.setFont('helvetica', 'italic'); // Just italic for link in quote
+            } else {
+              pdf.setFont('helvetica', 'normal'); // Links not bold by default
+            }
           }
         } else {
           pdf.setTextColor(110, 110, 110); // Lighter gray for quote text
@@ -600,34 +641,57 @@ export async function exportToPDF(title: string, content: string, filename?: str
       }
       
       // Render text
-      const width = pdf.getTextWidth(segment.text);
+      let width: number;
       
-      // Render text (links show URL in parentheses)
-      if (segment.link) {
-        // Render text with blue color first
+      // Special handling for note references - use monospace and accent color (even in quotes)
+      if (segment.link && segment.link.startsWith('note:')) {
+        // Note reference: use monospace font and accent color
+        pdf.setFont('courier', 'normal');
+        pdf.setTextColor(232, 147, 95); // Accent color
+        pdf.setFontSize(fontSize * 0.95); // Slightly smaller for monospace
+        
+        width = pdf.getTextWidth(segment.text);
         pdf.text(segment.text, x, y);
         
-        // Then add the clickable link area on top
-        const textHeight = fontSize * 0.35277778;
-        pdf.link(x, y - textHeight, width, textHeight, { url: segment.link });
+        // Add strikethrough if needed
+        if (segment.strikethrough) {
+          pdf.setDrawColor(80, 80, 80);
+          pdf.setLineWidth(0.2);
+          pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
+        }
         
-        // Add subtle underline
-        pdf.setDrawColor(80, 120, 160); // Muted blue-gray to match link color
-        pdf.setLineWidth(0.3); // Thinner underline for subtlety
-        const underlineY = y + 1.5; // Position underline below baseline
-        pdf.line(x, underlineY, x + width, underlineY);
+        x += width;
       } else {
-        pdf.text(segment.text, x, y);
+        // Regular rendering for non-note-reference segments
+        width = pdf.getTextWidth(segment.text);
+        
+        // Render text (links show URL in parentheses)
+        if (segment.link) {
+          // Regular link
+          pdf.text(segment.text, x, y);
+          
+          // Add clickable link area on top
+          const textHeight = fontSize * 0.35277778;
+          pdf.link(x, y - textHeight, width, textHeight, { url: segment.link });
+          
+          // Add subtle underline
+          pdf.setDrawColor(80, 120, 160); // Muted blue-gray to match link color
+          pdf.setLineWidth(0.3); // Thinner underline for subtlety
+          const underlineY = y + 1.5; // Position underline below baseline
+          pdf.line(x, underlineY, x + width, underlineY);
+        } else {
+          pdf.text(segment.text, x, y);
+        }
+        
+        // Add strikethrough if needed
+        if (segment.strikethrough) {
+          pdf.setDrawColor(80, 80, 80);
+          pdf.setLineWidth(0.2);
+          pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
+        }
+        
+        x += width;
       }
-      
-      // Add strikethrough if needed
-      if (segment.strikethrough) {
-        pdf.setDrawColor(80, 80, 80);
-        pdf.setLineWidth(0.2);
-        pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
-      }
-      
-      x += width;
     }
   };
 

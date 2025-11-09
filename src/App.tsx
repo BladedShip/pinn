@@ -21,6 +21,49 @@ function App() {
   const [needsPermissionRestore, setNeedsPermissionRestore] = useState(false);
   const [isRestoringPermission, setIsRestoringPermission] = useState(false);
 
+  // Parse URL to determine current view and note ID
+  const parseURL = () => {
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    
+    if (path.startsWith('/note/')) {
+      const noteId = path.split('/note/')[1];
+      return { view: 'editor' as const, noteId };
+    } else if (path === '/notes') {
+      return { view: 'notes' as const, noteId: null };
+    } else if (path === '/flows') {
+      return { view: 'flows' as const, noteId: null };
+    } else if (path.startsWith('/flow/')) {
+      const flowId = path.split('/flow/')[1];
+      return { view: 'flow' as const, flowId };
+    }
+    return { view: 'home' as const, noteId: null };
+  };
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const { view, noteId, flowId } = parseURL();
+      setCurrentView(view);
+      setCurrentNoteId(noteId || null);
+      setCurrentFlowId(flowId || null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    // Parse initial URL
+    const { view, noteId, flowId } = parseURL();
+    if (view !== 'home' || noteId) {
+      setCurrentView(view);
+      setCurrentNoteId(noteId || null);
+      setCurrentFlowId(flowId || null);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   // Detect mobile devices
   useEffect(() => {
     const checkMobile = () => {
@@ -158,30 +201,43 @@ function App() {
     setCurrentView('home');
     setCurrentNoteId(null);
     setCurrentFlowId(null);
+    window.history.pushState({}, '', '/');
   };
 
   const navigateToEditor = (noteId?: string) => {
     setCurrentNoteId(noteId || null);
     setCurrentView('editor');
     setCurrentFlowId(null);
+    if (noteId) {
+      window.history.pushState({}, '', `/note/${noteId}`);
+    } else {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   const navigateToFlows = () => {
     setCurrentView('flows');
     setCurrentNoteId(null);
     setCurrentFlowId(null);
+    window.history.pushState({}, '', '/flows');
   };
 
   const navigateToNotes = () => {
     setCurrentView('notes');
     setCurrentNoteId(null);
     setCurrentFlowId(null);
+    window.history.pushState({}, '', '/notes');
   };
 
   const navigateToFlow = (flowId?: string) => {
     setCurrentFlowId(flowId || null);
     setCurrentView('flow');
     setCurrentNoteId(null);
+    if (flowId) {
+      window.history.pushState({}, '', `/flow/${flowId}`);
+    } else {
+      window.history.pushState({}, '', '/flows');
+    }
   };
 
   // Show loading state while initializing
@@ -292,7 +348,7 @@ function App() {
             {currentView === 'home' ? (
               <HomePage onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToFlow={navigateToFlow} onNavigateToNotes={navigateToNotes} />
             ) : currentView === 'editor' ? (
-              <EditorPage noteId={currentNoteId} onNavigateToHome={navigateToHome} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} />
+              <EditorPage noteId={currentNoteId} onNavigateToHome={navigateToHome} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} onNavigateToEditor={navigateToEditor} />
             ) : currentView === 'flows' ? (
               <FlowsPage onNavigateToFlow={navigateToFlow} onNavigateToHome={navigateToHome} onNavigateToNotes={navigateToNotes} />
             ) : currentView === 'notes' ? (
