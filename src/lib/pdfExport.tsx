@@ -105,6 +105,9 @@ function applyBasicSyntaxHighlighting(code: string): Array<{ text: string; color
  * Now includes links, images, and note references
  */
 function parseInlineMarkdown(text: string): TextSegment[] {
+  // Replace rupee symbol with "Rs." for reliable rendering (jsPDF Unicode support can be inconsistent)
+  text = text.replace(/₹/g, 'Rs. ');
+  
   const segments: TextSegment[] = [];
   let currentPos = 0;
   
@@ -361,6 +364,9 @@ export async function exportToPDF(title: string, content: string, filename?: str
     extraSpaceBefore: number = 0,
     extraSpaceAfter: number = 0
   ): void => {
+    // Replace rupee symbol with "Rs." for reliable rendering (jsPDF Unicode support can be inconsistent)
+    text = text.replace(/₹/g, 'Rs. ');
+    
     currentY += extraSpaceBefore;
     
     pdf.setFontSize(fontSize);
@@ -844,8 +850,10 @@ export async function exportToPDF(title: string, content: string, filename?: str
           pdf.setFont('courier', 'normal');
           
           for (const codeLine of codeBlockContent) {
+            // Replace rupee symbol with "Rs." for reliable rendering (jsPDF Unicode support can be inconsistent)
+            const processedCodeLine = codeLine.replace(/₹/g, 'Rs. ');
             // Apply syntax highlighting
-            const highlightedSegments = applyBasicSyntaxHighlighting(codeLine);
+            const highlightedSegments = applyBasicSyntaxHighlighting(processedCodeLine);
             let xPos = config.marginLeft + paddingLeft;
             
             for (const seg of highlightedSegments) {
@@ -1488,7 +1496,11 @@ export async function exportToPDF(title: string, content: string, filename?: str
               let cellText = row[c] || '';
               
               // Handle <br> tags - convert to line breaks for proper rendering
-              cellText = cellText.replace(/<br\s*\/?>/gi, '\n');
+              // Also handle escaped versions (like &lt;br&gt;)
+              cellText = cellText
+                .replace(/&lt;br\s*\/?&gt;/gi, '\n')
+                .replace(/&lt;br&gt;/gi, '\n')
+                .replace(/<br\s*\/?>/gi, '\n');
               
               // Replace rupee symbol with "Rs." for reliable rendering (jsPDF Unicode support can be inconsistent)
               // This ensures the currency symbol always renders correctly

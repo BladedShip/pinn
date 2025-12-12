@@ -18,6 +18,8 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'title' | 'date'>('date');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [lengthFilter, setLengthFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('All');
   const [showFolderDialog, setShowFolderDialog] = useState(false);
@@ -59,7 +61,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   useEffect(() => {
     filterAndSortNotes();
-  }, [notes, searchQuery, sortBy, selectedFolder]);
+  }, [notes, searchQuery, sortBy, selectedFolder, dateFilter, lengthFilter]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -158,6 +160,47 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       } else {
         filtered = filtered.filter((n) => (n.folder || '').trim() === selectedFolder);
       }
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+      filtered = filtered.filter((note) => {
+        const updatedDate = new Date(note.updated_at);
+        switch (dateFilter) {
+          case 'today':
+            return updatedDate >= today;
+          case 'week':
+            return updatedDate >= weekAgo;
+          case 'month':
+            return updatedDate >= monthAgo;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Length filter
+    if (lengthFilter !== 'all') {
+      filtered = filtered.filter((note) => {
+        const length = note.content.length;
+        switch (lengthFilter) {
+          case 'short':
+            return length < 500;
+          case 'medium':
+            return length >= 500 && length <= 2000;
+          case 'long':
+            return length > 2000;
+          default:
+            return true;
+        }
+      });
     }
 
     filtered = [...filtered].sort((a, b) => {
@@ -821,14 +864,45 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                   <h3 className="text-sm uppercase tracking-wider text-gray-500">
                     {selectedFolder === 'All' ? 'All Notes' : selectedFolder === 'Unfiled' ? 'Unfiled Notes' : `Notes in "${selectedFolder}"`}
                   </h3>
-                  {filteredNotes.length > 0 && (
-                    <button
-                      onClick={() => setSortBy(sortBy === 'title' ? 'date' : 'title')}
-                      className="text-sm text-gray-500 hover:text-theme-text-secondary transition-colors"
-                    >
-                      Sort By: {sortBy === 'title' ? 'Title' : 'Date'}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-4">
+                    {/* Date Filter */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Date:</span>
+                      <select
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')}
+                        className="text-xs bg-theme-bg-secondary border border-theme-border rounded px-2 py-1 text-theme-text-secondary hover:text-theme-text-primary focus:outline-none focus:border-gray-600 transition-colors"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                      </select>
+                    </div>
+                    {/* Length Filter */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Length:</span>
+                      <select
+                        value={lengthFilter}
+                        onChange={(e) => setLengthFilter(e.target.value as 'all' | 'short' | 'medium' | 'long')}
+                        className="text-xs bg-theme-bg-secondary border border-theme-border rounded px-2 py-1 text-theme-text-secondary hover:text-theme-text-primary focus:outline-none focus:border-gray-600 transition-colors"
+                      >
+                        <option value="all">All</option>
+                        <option value="short">Short (&lt;500)</option>
+                        <option value="medium">Medium (500-2000)</option>
+                        <option value="long">Long (&gt;2000)</option>
+                      </select>
+                    </div>
+                    {/* Sort By */}
+                    {filteredNotes.length > 0 && (
+                      <button
+                        onClick={() => setSortBy(sortBy === 'title' ? 'date' : 'title')}
+                        className="text-sm text-gray-500 hover:text-theme-text-secondary transition-colors"
+                      >
+                        Sort By: {sortBy === 'title' ? 'Title' : 'Date'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

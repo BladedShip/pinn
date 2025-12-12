@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -40,9 +40,28 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
   const preprocessContent = (text: string): string => {
     if (!text) return text;
     
+    // Split into lines to process table rows separately
+    const lines = text.split('\n');
+    const processed: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      const isTableRow = line.includes('|') && line.trim().startsWith('|');
+      
+      if (!isTableRow) {
+        // For non-table content, replace <br> tags with markdown line breaks (two spaces + newline)
+        line = line.replace(/<br\s*\/?>/gi, '  \n');
+      }
+      // For table rows, keep <br> tags as-is - they'll be escaped by react-markdown
+      // and handled by our custom cell renderers
+      
+      processed.push(line);
+    }
+    
+    let result = processed.join('\n');
+    
     // Replace any newlines (single or multiple) around URLs with a single space
     // This forces URLs to stay inline with text
-    let result = text;
     
     // Replace: text + newline(s) + URL with: text + space + URL
     result = result.replace(/([^\n])\n+(?=https?:\/\/)/g, '$1 ');
@@ -52,30 +71,30 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
     
     // Special case: if a line is ONLY a URL, merge it
     // Split into lines and process
-    const lines = result.split('\n');
-    const processed: string[] = [];
+    const urlProcessedLines = result.split('\n');
+    const finalProcessed: string[] = [];
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+    for (let i = 0; i < urlProcessedLines.length; i++) {
+      const line = urlProcessedLines[i].trim();
       const isOnlyUrl = /^https?:\/\/[^\s]+$/.test(line);
       
-      if (isOnlyUrl && processed.length > 0) {
+      if (isOnlyUrl && finalProcessed.length > 0) {
         // Append URL to previous line with a space
-        processed[processed.length - 1] += ' ' + line;
-      } else if (isOnlyUrl && i < lines.length - 1) {
+        finalProcessed[finalProcessed.length - 1] += ' ' + line;
+      } else if (isOnlyUrl && i < urlProcessedLines.length - 1) {
         // Prepend URL to next line with a space
-        const nextLine = lines[i + 1].trim();
+        const nextLine = urlProcessedLines[i + 1].trim();
         if (nextLine) {
-          lines[i + 1] = line + ' ' + nextLine;
+          urlProcessedLines[i + 1] = line + ' ' + nextLine;
         } else {
-          processed.push(line);
+          finalProcessed.push(urlProcessedLines[i]);
         }
       } else {
-        processed.push(lines[i]);
+        finalProcessed.push(urlProcessedLines[i]);
       }
     }
     
-    return processed.join('\n');
+    return finalProcessed.join('\n');
   };
 
   const processedContent = preprocessContent(content);
@@ -336,6 +355,96 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
               >
                 {children}
               </a>
+            );
+          },
+          td({ node, children, ...props }: any) {
+            // Process children to convert <br> tags and markers to line breaks
+            const processCellContent = (content: any): any => {
+              if (typeof content === 'string') {
+                // First, handle escaped <br> tags (like &lt;br&gt;)
+                let text = content
+                  .replace(/&lt;br\s*\/?&gt;/gi, '\u200B\u200B')
+                  .replace(/&lt;br&gt;/gi, '\u200B\u200B');
+                
+                // Handle regular <br> tags
+                text = text.replace(/<br\s*\/?>/gi, '\u200B\u200B');
+                
+                // Split by the marker and convert to React elements
+                const parts = text.split('\u200B\u200B');
+                return parts.map((part, index) => {
+                  if (index < parts.length - 1) {
+                    return <React.Fragment key={index}>{part}<br /></React.Fragment>;
+                  }
+                  return part;
+                });
+              }
+              if (Array.isArray(content)) {
+                return content.map((child, index) => {
+                  if (typeof child === 'string') {
+                    return <React.Fragment key={index}>{processCellContent(child)}</React.Fragment>;
+                  }
+                  // Recursively process child elements
+                  if (React.isValidElement(child) && child.props?.children) {
+                    return React.cloneElement(child, {
+                      key: index,
+                      children: processCellContent(child.props.children)
+                    });
+                  }
+                  return child;
+                });
+              }
+              return content;
+            };
+            
+            return (
+              <td {...props} style={{ whiteSpace: 'pre-wrap' }}>
+                {processCellContent(children)}
+              </td>
+            );
+          },
+          th({ node, children, ...props }: any) {
+            // Process children to convert <br> tags and markers to line breaks
+            const processCellContent = (content: any): any => {
+              if (typeof content === 'string') {
+                // First, handle escaped <br> tags (like &lt;br&gt;)
+                let text = content
+                  .replace(/&lt;br\s*\/?&gt;/gi, '\u200B\u200B')
+                  .replace(/&lt;br&gt;/gi, '\u200B\u200B');
+                
+                // Handle regular <br> tags
+                text = text.replace(/<br\s*\/?>/gi, '\u200B\u200B');
+                
+                // Split by the marker and convert to React elements
+                const parts = text.split('\u200B\u200B');
+                return parts.map((part, index) => {
+                  if (index < parts.length - 1) {
+                    return <React.Fragment key={index}>{part}<br /></React.Fragment>;
+                  }
+                  return part;
+                });
+              }
+              if (Array.isArray(content)) {
+                return content.map((child, index) => {
+                  if (typeof child === 'string') {
+                    return <React.Fragment key={index}>{processCellContent(child)}</React.Fragment>;
+                  }
+                  // Recursively process child elements
+                  if (React.isValidElement(child) && child.props?.children) {
+                    return React.cloneElement(child, {
+                      key: index,
+                      children: processCellContent(child.props.children)
+                    });
+                  }
+                  return child;
+                });
+              }
+              return content;
+            };
+            
+            return (
+              <th {...props} style={{ whiteSpace: 'pre-wrap' }}>
+                {processCellContent(children)}
+              </th>
             );
           },
         }}
