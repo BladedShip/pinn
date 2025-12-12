@@ -274,17 +274,23 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
   };
 
   useEffect(() => {
-    if (!isEditMode) return;
+    // Save title changes in both edit and preview modes
+    // Content changes only happen in edit mode (preview is read-only)
     setSaving(true);
     const t = setTimeout(() => {
       try {
         if (currentNoteId) {
+          const existingNote = getNoteById(currentNoteId);
+          // In preview mode, content is read-only so use existing content
+          // In edit mode, use current content state
+          const contentToSave = isEditMode ? content : (existingNote?.content || content);
+          
           const updated = saveNote({
             id: currentNoteId,
             title: title || 'Untitled',
-            content,
+            content: contentToSave,
             folder: folder === 'Unfiled' ? undefined : folder,
-            created_at: getNoteById(currentNoteId)?.created_at || new Date().toISOString(),
+            created_at: existingNote?.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
           setCurrentNoteId(updated.id);
@@ -307,7 +313,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [title, content, isEditMode, currentNoteId]);
+  }, [title, content, isEditMode, currentNoteId, folder]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
