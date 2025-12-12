@@ -18,6 +18,7 @@ interface TextSegment {
   strikethrough: boolean;
   link?: string;
   isImage?: boolean;
+  isTag?: boolean;
 }
 
 /**
@@ -111,10 +112,11 @@ function parseInlineMarkdown(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let currentPos = 0;
   
-  // Pattern to match: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), ![image](url), [[note:id|title]]
+  // Pattern to match: **bold**, *italic*, `code`, ~~strikethrough~~, [link](url), ![image](url), [[note:id|title]], #tag
   // Note: Bold must come before italic to avoid matching ** as two italic markers
   // Use non-greedy matching to ensure we match the full pattern correctly
-  const pattern = /(\*\*([^*]+?)\*\*|\*([^*\s][^*]*?[^*\s])\*|\*([^*\s])\*|`([^`]+?)`|~~([^~]+?)~~|!\[([^\]]*?)\]\(([^)]+?)\)|\[\[note:([^\]|]+?)\|([^\]]+?)\]\]|\[([^\]]+?)\]\(([^)]+?)\))/g;
+  // Tags pattern: # followed by word characters and underscores (e.g., #tag, #tag_name)
+  const pattern = /(\*\*([^*]+?)\*\*|\*([^*\s][^*]*?[^*\s])\*|\*([^*\s])\*|`([^`]+?)`|~~([^~]+?)~~|!\[([^\]]*?)\]\(([^)]+?)\)|\[\[note:([^\]|]+?)\|([^\]]+?)\]\]|\[([^\]]+?)\]\(([^)]+?)\)|(#[\w_]+))/g;
   
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) !== null) {
@@ -210,22 +212,82 @@ function parseInlineMarkdown(text: string): TextSegment[] {
         strikethrough: false,
         link: match[12],
       });
+    } else if (match[13]) {
+      // #tag - tag
+      segments.push({
+        text: match[13],
+        bold: false,
+        italic: false,
+        code: false,
+        strikethrough: false,
+        isTag: true,
+      });
     }
     
     currentPos = match.index + match[0].length;
   }
   
-  // Add any remaining text
+  // Add any remaining text - check if it contains tags
   if (currentPos < text.length) {
     const remainingText = text.substring(currentPos);
     if (remainingText) {
-      segments.push({
-        text: remainingText,
-        bold: false,
-        italic: false,
-        code: false,
-        strikethrough: false,
-      });
+      // Check if remaining text contains tags that weren't matched
+      const tagPattern = /(#[\w_]+)/g;
+      let tagMatch: RegExpExecArray | null;
+      let lastTagPos = 0;
+      
+      while ((tagMatch = tagPattern.exec(remainingText)) !== null) {
+        // Add text before tag
+        if (tagMatch.index > lastTagPos) {
+          const textBefore = remainingText.substring(lastTagPos, tagMatch.index);
+          if (textBefore) {
+            segments.push({
+              text: textBefore,
+              bold: false,
+              italic: false,
+              code: false,
+              strikethrough: false,
+            });
+          }
+        }
+        
+        // Add tag
+        segments.push({
+          text: tagMatch[0],
+          bold: false,
+          italic: false,
+          code: false,
+          strikethrough: false,
+          isTag: true,
+        });
+        
+        lastTagPos = tagMatch.index + tagMatch[0].length;
+      }
+      
+      // Add remaining text after last tag
+      if (lastTagPos < remainingText.length) {
+        const textAfter = remainingText.substring(lastTagPos);
+        if (textAfter) {
+          segments.push({
+            text: textAfter,
+            bold: false,
+            italic: false,
+            code: false,
+            strikethrough: false,
+          });
+        }
+      }
+      
+      // If no tags found, add as plain text
+      if (lastTagPos === 0) {
+        segments.push({
+          text: remainingText,
+          bold: false,
+          italic: false,
+          code: false,
+          strikethrough: false,
+        });
+      }
     }
   }
   
@@ -246,7 +308,7 @@ function parseInlineMarkdown(text: string): TextSegment[] {
   
   for (const segment of segments) {
     // Only process plain text segments (not already formatted)
-    if (!segment.bold && !segment.italic && !segment.code && !segment.strikethrough && !segment.link && !segment.isImage) {
+    if (!segment.bold && !segment.italic && !segment.code && !segment.strikethrough && !segment.link && !segment.isImage && !segment.isTag) {
       const text = segment.text;
       let lastIndex = 0;
       let urlMatch: RegExpExecArray | null;
@@ -467,6 +529,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
               code: segment.code,
               strikethrough: segment.strikethrough,
               link: segment.link, // Preserve link property
+              isTag: segment.isTag, // Preserve tag property
+              isImage: segment.isImage, // Preserve image property
             });
             currentLineWidth += fitWidth;
             
@@ -491,6 +555,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
             code: segment.code,
             strikethrough: segment.strikethrough,
             link: segment.link, // Preserve link property
+            isTag: segment.isTag, // Preserve tag property
+            isImage: segment.isImage, // Preserve image property
           });
           currentLineWidth += wordWidth;
         }
@@ -512,45 +578,15 @@ export async function exportToPDF(title: string, content: string, filename?: str
     let x = startX;
     
     for (const segment of segments) {
-      // Set font style
-      if (segment.code) {
-        pdf.setFont('courier', 'normal');
-        pdf.setFontSize(fontSize * 0.9);
-        pdf.setTextColor(60, 60, 60);
-        
-        // Draw background for inline code
-        const width = pdf.getTextWidth(segment.text);
-        pdf.setFillColor(240, 240, 240);
-        pdf.rect(x - 0.5, y - fontSize * 0.25, width + 1, fontSize * 0.35, 'F');
-      } else if (segment.isImage) {
-        // Images shown as gray italic text
-        pdf.setFontSize(fontSize * 0.9);
-        pdf.setTextColor(100, 100, 100);
-        pdf.setFont('helvetica', 'italic');
-      } else {
-        pdf.setFontSize(fontSize);
-        pdf.setTextColor(40, 40, 40); // Dark gray instead of pure black
-        
-        if (segment.bold && segment.italic) {
-          pdf.setFont('helvetica', 'bolditalic');
-        } else if (segment.bold) {
-          pdf.setFont('helvetica', 'bold');
-        } else if (segment.italic) {
-          pdf.setFont('helvetica', 'italic');
-        } else {
-          pdf.setFont('helvetica', 'normal');
-        }
-      }
-      
       // Render text
       let width: number;
       
-      // Special handling for note references - use monospace and accent color
-      if (segment.link && segment.link.startsWith('note:')) {
-        // Note reference: use monospace font and accent color
+      // Special handling for tags - render with monospace and blue color
+      if (segment.isTag) {
+        // Tags: monospace font with blue color
         pdf.setFont('courier', 'normal');
-        pdf.setTextColor(232, 147, 95); // Accent color
-        pdf.setFontSize(fontSize * 0.95); // Slightly smaller for monospace
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(59, 130, 246); // Blue color (rgb(59, 130, 246))
         
         width = pdf.getTextWidth(segment.text);
         pdf.text(segment.text, x, y);
@@ -564,11 +600,57 @@ export async function exportToPDF(title: string, content: string, filename?: str
         
         x += width;
       } else {
-        // Regular rendering for non-note-reference segments
+        // Set font style for non-tag segments
+        if (segment.code) {
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(fontSize * 0.9);
+          pdf.setTextColor(60, 60, 60);
+          
+          // Draw background for inline code
+          width = pdf.getTextWidth(segment.text);
+          pdf.setFillColor(240, 240, 240);
+          pdf.rect(x - 0.5, y - fontSize * 0.25, width + 1, fontSize * 0.35, 'F');
+        } else if (segment.isImage) {
+          // Images shown as gray italic text
+          pdf.setFontSize(fontSize * 0.9);
+          pdf.setTextColor(100, 100, 100);
+          pdf.setFont('helvetica', 'italic');
+        } else {
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(40, 40, 40); // Dark gray instead of pure black
+          
+          if (segment.bold && segment.italic) {
+            pdf.setFont('helvetica', 'bolditalic');
+          } else if (segment.bold) {
+            pdf.setFont('helvetica', 'bold');
+          } else if (segment.italic) {
+            pdf.setFont('helvetica', 'italic');
+          } else {
+            pdf.setFont('helvetica', 'normal');
+          }
+        }
+        
+        // Regular rendering for non-tag segments
         width = pdf.getTextWidth(segment.text);
         
         // Render text (links show URL in parentheses)
-        if (segment.link) {
+        if (segment.link && segment.link.startsWith('note:')) {
+          // Note reference: use monospace font and accent color
+          pdf.setFont('courier', 'normal');
+          pdf.setTextColor(232, 147, 95); // Accent color
+          pdf.setFontSize(fontSize * 0.95); // Slightly smaller for monospace
+          
+          pdf.text(segment.text, x, y);
+          
+          // Add strikethrough if needed
+          if (segment.strikethrough) {
+            pdf.setDrawColor(0, 0, 0);
+            pdf.setLineWidth(0.2);
+            pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
+          }
+          
+          x += width;
+        } else if (segment.link) {
           // Regular link
           pdf.setTextColor(80, 120, 160); // Muted blue-gray for regular links
           
@@ -615,56 +697,28 @@ export async function exportToPDF(title: string, content: string, filename?: str
     let x = startX;
     
     for (const segment of segments) {
-      // Set font style - quotes are gray and italic by default
-      if (segment.code) {
-        pdf.setFont('courier', 'normal');
-        pdf.setFontSize(fontSize * 0.9);
-        pdf.setTextColor(110, 110, 110);
-        
-        // Draw background for inline code
-        const width = pdf.getTextWidth(segment.text);
-        pdf.setFillColor(240, 240, 240);
-        pdf.rect(x - 0.5, y - fontSize * 0.25, width + 1, fontSize * 0.35, 'F');
-      } else {
-        pdf.setFontSize(fontSize);
-        
-        // Handle links in quotes - check if it's a note reference or regular link
-        if (segment.link) {
-          const isNoteReference = segment.link.startsWith('note:');
-          if (isNoteReference) {
-            pdf.setFont('courier', 'normal'); // Monospace for note references
-            pdf.setTextColor(232, 147, 95); // Accent color for note references
-          } else {
-            pdf.setTextColor(80, 120, 160); // Muted blue-gray for regular links
-            
-            if (segment.bold && segment.italic) {
-              pdf.setFont('helvetica', 'bolditalic');
-            } else if (segment.bold) {
-              pdf.setFont('helvetica', 'bold');
-            } else if (segment.italic) {
-              pdf.setFont('helvetica', 'italic'); // Just italic for link in quote
-            } else {
-              pdf.setFont('helvetica', 'normal'); // Links not bold by default
-            }
-          }
-        } else {
-          pdf.setTextColor(110, 110, 110); // Lighter gray for quote text
-          
-          if (segment.bold && segment.italic) {
-            pdf.setFont('helvetica', 'bolditalic');
-          } else if (segment.bold) {
-            pdf.setFont('helvetica', 'bold');
-          } else {
-            pdf.setFont('helvetica', 'italic'); // Quotes are italic
-          }
-        }
-      }
-      
       // Render text
       let width: number;
       
-      // Special handling for note references - use monospace and accent color (even in quotes)
-      if (segment.link && segment.link.startsWith('note:')) {
+      // Special handling for tags - render with monospace and blue color (even in quotes)
+      if (segment.isTag) {
+        // Tags: monospace font with blue color (even in quotes)
+        pdf.setFont('courier', 'normal');
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(59, 130, 246); // Blue color
+        
+        width = pdf.getTextWidth(segment.text);
+        pdf.text(segment.text, x, y);
+        
+        // Add strikethrough if needed
+        if (segment.strikethrough) {
+          pdf.setDrawColor(80, 80, 80);
+          pdf.setLineWidth(0.2);
+          pdf.line(x, y - fontSize * 0.15, x + width, y - fontSize * 0.15);
+        }
+        
+        x += width;
+      } else if (segment.link && segment.link.startsWith('note:')) {
         // Note reference: use monospace font and accent color
         pdf.setFont('courier', 'normal');
         pdf.setTextColor(232, 147, 95); // Accent color
@@ -682,11 +736,56 @@ export async function exportToPDF(title: string, content: string, filename?: str
         
         x += width;
       } else {
-        // Regular rendering for non-note-reference segments
+        // Set font style - quotes are gray and italic by default
+        if (segment.code) {
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(fontSize * 0.9);
+          pdf.setTextColor(110, 110, 110);
+          
+          // Draw background for inline code
+          width = pdf.getTextWidth(segment.text);
+          pdf.setFillColor(240, 240, 240);
+          pdf.rect(x - 0.5, y - fontSize * 0.25, width + 1, fontSize * 0.35, 'F');
+        } else {
+          pdf.setFontSize(fontSize);
+          
+          // Handle links in quotes - check if it's a note reference or regular link
+          if (segment.link) {
+            const isNoteReference = segment.link.startsWith('note:');
+            if (isNoteReference) {
+              pdf.setFont('courier', 'normal'); // Monospace for note references
+              pdf.setTextColor(232, 147, 95); // Accent color for note references
+            } else {
+              pdf.setTextColor(80, 120, 160); // Muted blue-gray for regular links
+              
+              if (segment.bold && segment.italic) {
+                pdf.setFont('helvetica', 'bolditalic');
+              } else if (segment.bold) {
+                pdf.setFont('helvetica', 'bold');
+              } else if (segment.italic) {
+                pdf.setFont('helvetica', 'italic'); // Just italic for link in quote
+              } else {
+                pdf.setFont('helvetica', 'normal'); // Links not bold by default
+              }
+            }
+          } else {
+            pdf.setTextColor(110, 110, 110); // Lighter gray for quote text
+            
+            if (segment.bold && segment.italic) {
+              pdf.setFont('helvetica', 'bolditalic');
+            } else if (segment.bold) {
+              pdf.setFont('helvetica', 'bold');
+            } else {
+              pdf.setFont('helvetica', 'italic'); // Quotes are italic
+            }
+          }
+        }
+        
+        // Regular rendering for non-tag, non-note-reference segments
         width = pdf.getTextWidth(segment.text);
         
         // Render text (links show URL in parentheses)
-        if (segment.link) {
+        if (segment.link && !segment.link.startsWith('note:')) {
           // Regular link
           pdf.text(segment.text, x, y);
           
@@ -990,6 +1089,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
                 code: segment.code,
                 strikethrough: segment.strikethrough,
                 link: segment.link, // Preserve link property
+                isTag: segment.isTag, // Preserve tag property
+                isImage: segment.isImage, // Preserve image property
               });
               currentLineWidth += fitWidth;
               
@@ -1011,6 +1112,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
               code: segment.code,
               strikethrough: segment.strikethrough,
               link: segment.link, // Preserve link property
+              isTag: segment.isTag, // Preserve tag property
+              isImage: segment.isImage, // Preserve image property
             });
             currentLineWidth += wordWidth;
           }
@@ -1126,6 +1229,9 @@ export async function exportToPDF(title: string, content: string, filename?: str
                 italic: segment.italic,
                 code: segment.code,
                 strikethrough: segment.strikethrough,
+                isTag: segment.isTag, // Preserve tag property
+                isImage: segment.isImage, // Preserve image property
+                link: segment.link, // Preserve link property
               });
               currentLineWidth += fitWidth;
               
@@ -1146,6 +1252,9 @@ export async function exportToPDF(title: string, content: string, filename?: str
               italic: segment.italic,
               code: segment.code,
               strikethrough: segment.strikethrough,
+              isTag: segment.isTag, // Preserve tag property
+              isImage: segment.isImage, // Preserve image property
+              link: segment.link, // Preserve link property
             });
             currentLineWidth += wordWidth;
           }
@@ -1269,6 +1378,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
                 code: segment.code,
                 strikethrough: segment.strikethrough,
                 link: segment.link, // Preserve link property
+                isTag: segment.isTag, // Preserve tag property
+                isImage: segment.isImage, // Preserve image property
               });
               currentLineWidth += fitWidth;
               
@@ -1290,6 +1401,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
               code: segment.code,
               strikethrough: segment.strikethrough,
               link: segment.link, // Preserve link property
+              isTag: segment.isTag, // Preserve tag property
+              isImage: segment.isImage, // Preserve image property
             });
             currentLineWidth += wordWidth;
           }
@@ -1382,6 +1495,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
                 code: segment.code,
                 strikethrough: segment.strikethrough,
                 link: segment.link, // Preserve link property
+                isTag: segment.isTag, // Preserve tag property
+                isImage: segment.isImage, // Preserve image property
               });
               currentLineWidth += fitWidth;
               
@@ -1403,6 +1518,8 @@ export async function exportToPDF(title: string, content: string, filename?: str
               code: segment.code,
               strikethrough: segment.strikethrough,
               link: segment.link, // Preserve link property
+              isTag: segment.isTag, // Preserve tag property
+              isImage: segment.isImage, // Preserve image property
             });
             currentLineWidth += wordWidth;
           }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -12,6 +12,46 @@ interface MarkdownPreviewProps {
 
 export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownPreviewProps) {
   const [copiedCodeBlocks, setCopiedCodeBlocks] = useState<Set<number>>(new Set());
+  
+  // Helper function to process tags in text
+  const processTagsInText = (text: string): React.ReactNode[] => {
+    if (!text) return [text];
+    
+    const tagPattern = /(#\w+)/g;
+    const parts: Array<{ text: string; isTag: boolean }> = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = tagPattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ text: text.substring(lastIndex, match.index), isTag: false });
+      }
+      parts.push({ text: match[0], isTag: true });
+      lastIndex = match.index + match[0].length;
+    }
+    
+    if (lastIndex < text.length) {
+      parts.push({ text: text.substring(lastIndex), isTag: false });
+    }
+    
+    if (parts.length === 0) {
+      return [text];
+    }
+    
+    return parts.map((part, index) => {
+      if (part.isTag) {
+        return (
+          <span
+            key={`tag-${index}`}
+            className="markdown-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30"
+          >
+            {part.text}
+          </span>
+        );
+      }
+      return <span key={`text-${index}`}>{part.text}</span>;
+    });
+  };
   
   const handleCopyCode = async (code: string, index: number) => {
     try {
@@ -105,37 +145,151 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
         remarkPlugins={[remarkGfm]}
         components={{
           text({ node, ...props }: any) {
-            // Render text nodes with inline URL detection
+            // Render text nodes with inline URL, note reference, and tag detection
             const text = node.value || '';
-            const urlPattern = /(https?:\/\/[^\s<>"{}|\\^`\[\]()]+)/g;
-            const parts = text.split(urlPattern);
             
-            return (
-              <>
-                {parts.map((part, index) => {
-                  if (part.match(/^https?:\/\//)) {
-                    // This is a URL - render as inline link
-                    return (
-                      <a
-                        key={index}
-                        href={part}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="markdown-link"
-                        style={{
-                          display: 'inline',
-                          wordBreak: 'break-all',
-                          overflowWrap: 'anywhere',
-                        }}
-                      >
-                        {part}
-                      </a>
-                    );
-                  }
-                  return part;
-                })}
-              </>
-            );
+            // Helper to process text and extract note refs, URLs, and tags
+            const processTextWithRefs = (inputText: string): React.ReactNode[] => {
+              if (!inputText) return [inputText];
+              
+              const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+              let lastIndex = 0;
+              
+              // Combined pattern to match note refs, URLs, and tags
+              // Note: Order matters - note refs first, then URLs, then tags
+              const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+              let match;
+              
+              while ((match = combinedPattern.exec(inputText)) !== null) {
+                // Add text before the match
+                if (match.index > lastIndex) {
+                  parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
+                }
+                
+                // Determine what was matched
+                if (match[1].startsWith('[[note:')) {
+                  // Note reference
+                  parts.push({
+                    text: '',
+                    type: 'note',
+                    noteId: match[2],
+                    noteTitle: match[3],
+                  });
+                } else if (match[1].startsWith('http')) {
+                  // URL
+                  parts.push({ text: match[1], type: 'url' });
+                } else if (match[1].startsWith('#')) {
+                  // Tag
+                  parts.push({ text: match[1], type: 'tag' });
+                } else {
+                  // Shouldn't happen, but fallback
+                  parts.push({ text: match[1], type: 'text' });
+                }
+                
+                lastIndex = match.index + match[0].length;
+              }
+              
+              // Add remaining text
+              if (lastIndex < inputText.length) {
+                parts.push({ text: inputText.substring(lastIndex), type: 'text' });
+              }
+              
+              // If no matches, return original text
+              if (parts.length === 0) {
+                parts.push({ text: inputText, type: 'text' });
+              }
+              
+              // Render parts
+              return parts.map((part, index) => {
+                if (part.type === 'note' && part.noteId && part.noteTitle) {
+                  return (
+                    <span
+                      key={`note-ref-${index}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onNavigateToNote) {
+                          onNavigateToNote(part.noteId!);
+                        }
+                      }}
+                      className="note-reference-tag"
+                      title={`Click to open: ${part.noteTitle}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        cursor: onNavigateToNote ? 'pointer' : 'default',
+                        backgroundColor: 'rgba(232, 147, 95, 0.15)',
+                        color: 'rgb(232, 147, 95)',
+                        border: '1px solid rgba(232, 147, 95, 0.4)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875em',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease',
+                        margin: '0 0.2rem',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'middle',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onNavigateToNote) {
+                          const target = e.currentTarget as HTMLElement;
+                          target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
+                          target.style.borderColor = 'rgba(232, 147, 95, 0.6)';
+                          target.style.transform = 'translateY(-1px)';
+                          target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const target = e.currentTarget as HTMLElement;
+                        target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
+                        target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
+                        target.style.transform = 'translateY(0)';
+                        target.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Book style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }} />
+                      {part.noteTitle}
+                    </span>
+                  );
+                }
+                
+                if (part.type === 'url') {
+                  return (
+                    <a
+                      key={`url-${index}`}
+                      href={part.text}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="markdown-link"
+                      style={{
+                        display: 'inline',
+                        wordBreak: 'break-all',
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {part.text}
+                    </a>
+                  );
+                }
+                
+                if (part.type === 'tag') {
+                  return (
+                    <span
+                      key={`tag-${index}`}
+                      className="markdown-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    >
+                      {part.text}
+                    </span>
+                  );
+                }
+                
+                // Plain text - process for nested tags (in case tags appear in plain text segments)
+                return <span key={`text-${index}`}>{part.text}</span>;
+              });
+            };
+            
+            return <>{processTextWithRefs(text)}</>;
           },
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
@@ -202,22 +356,22 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                     customStyle={{
                       margin: '1rem 0',
                       borderRadius: '6px',
-                      padding: '0.5rem 0.75rem',
+                      padding: '0.75rem',
                       paddingTop: '2.25rem',
-                      paddingBottom: '0.5rem',
+                      paddingBottom: '0.75rem',
                       overflowX: 'hidden',
                       wordWrap: 'break-word',
                       whiteSpace: 'pre-wrap',
                       overflowWrap: 'break-word',
-                      backgroundColor: 'transparent',
+                      backgroundColor: 'var(--color-bg-secondary)',
                       border: 'none',
                       fontSize: '0.875rem',
                       lineHeight: '1.5',
-                      color: '#d1d5db',
+                      color: 'var(--color-text-primary)',
                     }}
                     codeTagProps={{
                       style: {
-                        color: '#d1d5db',
+                        color: 'var(--color-text-primary)',
                         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                         background: 'transparent',
                       }
@@ -235,18 +389,21 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
             return <pre {...props}>{children}</pre>;
           },
           p({ node, children, ...props }: any) {
-            // Parse paragraph text to detect note references
+            // Parse paragraph text to detect note references and tags
             const parseContent = (children: any): any => {
               if (typeof children === 'string') {
+                // First process note references
                 const noteRefPattern = /\[\[note:([^\]|]+)\|([^\]]+)\]\]/g;
                 const parts: any[] = [];
                 let lastIndex = 0;
                 let match;
 
                 while ((match = noteRefPattern.exec(children)) !== null) {
-                  // Add text before the match
+                  // Add text before the match (which may contain tags)
                   if (match.index > lastIndex) {
-                    parts.push(children.substring(lastIndex, match.index));
+                    const textBefore = children.substring(lastIndex, match.index);
+                    const tagElements = processTagsInText(textBefore);
+                    parts.push(...tagElements);
                   }
 
                   // Add note reference component
@@ -306,23 +463,25 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   lastIndex = match.index + match[0].length;
                 }
 
-                // Add remaining text
+                // Add remaining text (which may contain tags)
                 if (lastIndex < children.length) {
-                  parts.push(children.substring(lastIndex));
+                  const textAfter = children.substring(lastIndex);
+                  const tagElements = processTagsInText(textAfter);
+                  parts.push(...tagElements);
                 }
 
-                return parts.length > 0 ? parts : children;
+                return parts.length > 0 ? parts : processTagsInText(children);
               }
 
               // Handle array of children
               if (Array.isArray(children)) {
                 return children.map((child, index) => {
                   if (typeof child === 'string') {
-                    return parseContent(child);
+                    return <React.Fragment key={index}>{parseContent(child)}</React.Fragment>;
                   }
                   // If it's a text node object
                   if (child?.props?.node?.type === 'text' && child?.props?.node?.value) {
-                    return parseContent(child.props.node.value);
+                    return <React.Fragment key={index}>{parseContent(child.props.node.value)}</React.Fragment>;
                   }
                   return child;
                 });
@@ -355,6 +514,290 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
               >
                 {children}
               </a>
+            );
+          },
+          li({ node, children, ...props }: any) {
+            // Process children to handle note references, tags, and URLs in list items
+            const processChildren = (children: any): any => {
+              if (typeof children === 'string') {
+                // Use the same processing logic as the text component
+                const processTextWithRefs = (inputText: string): React.ReactNode[] => {
+                  if (!inputText) return [inputText];
+                  
+                  const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+                  let lastIndex = 0;
+                  
+                  const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+                  let match;
+                  
+                  while ((match = combinedPattern.exec(inputText)) !== null) {
+                    if (match.index > lastIndex) {
+                      parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
+                    }
+                    
+                    if (match[1].startsWith('[[note:')) {
+                      parts.push({
+                        text: '',
+                        type: 'note',
+                        noteId: match[2],
+                        noteTitle: match[3],
+                      });
+                    } else if (match[1].startsWith('http')) {
+                      parts.push({ text: match[1], type: 'url' });
+                    } else if (match[1].startsWith('#')) {
+                      parts.push({ text: match[1], type: 'tag' });
+                    } else {
+                      parts.push({ text: match[1], type: 'text' });
+                    }
+                    
+                    lastIndex = match.index + match[0].length;
+                  }
+                  
+                  if (lastIndex < inputText.length) {
+                    parts.push({ text: inputText.substring(lastIndex), type: 'text' });
+                  }
+                  
+                  if (parts.length === 0) {
+                    parts.push({ text: inputText, type: 'text' });
+                  }
+                  
+                  return parts.map((part, index) => {
+                    if (part.type === 'note' && part.noteId && part.noteTitle) {
+                      return (
+                        <span
+                          key={`note-ref-li-${index}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (onNavigateToNote) {
+                              onNavigateToNote(part.noteId!);
+                            }
+                          }}
+                          className="note-reference-tag"
+                          title={`Click to open: ${part.noteTitle}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            cursor: onNavigateToNote ? 'pointer' : 'default',
+                            backgroundColor: 'rgba(232, 147, 95, 0.15)',
+                            color: 'rgb(232, 147, 95)',
+                            border: '1px solid rgba(232, 147, 95, 0.4)',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontSize: '0.875em',
+                            fontWeight: '500',
+                            transition: 'all 0.2s ease',
+                            margin: '0 0.2rem',
+                            whiteSpace: 'nowrap',
+                            verticalAlign: 'middle',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (onNavigateToNote) {
+                              const target = e.currentTarget as HTMLElement;
+                              target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
+                              target.style.borderColor = 'rgba(232, 147, 95, 0.6)';
+                              target.style.transform = 'translateY(-1px)';
+                              target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const target = e.currentTarget as HTMLElement;
+                            target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
+                            target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
+                            target.style.transform = 'translateY(0)';
+                            target.style.boxShadow = 'none';
+                          }}
+                        >
+                          <Book style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }} />
+                          {part.noteTitle}
+                        </span>
+                      );
+                    }
+                    
+                    if (part.type === 'url') {
+                      return (
+                        <a
+                          key={`url-li-${index}`}
+                          href={part.text}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="markdown-link"
+                          style={{
+                            display: 'inline',
+                            wordBreak: 'break-all',
+                            overflowWrap: 'anywhere',
+                          }}
+                        >
+                          {part.text}
+                        </a>
+                      );
+                    }
+                    
+                    if (part.type === 'tag') {
+                      return (
+                        <span
+                          key={`tag-li-${index}`}
+                          className="markdown-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                        >
+                          {part.text}
+                        </span>
+                      );
+                    }
+                    
+                    return <span key={`text-li-${index}`}>{part.text}</span>;
+                  });
+                };
+                
+                return <>{processTextWithRefs(children)}</>;
+              }
+              if (Array.isArray(children)) {
+                return children.map((child, index) => {
+                  if (typeof child === 'string') {
+                    const processTextWithRefs = (inputText: string): React.ReactNode[] => {
+                      if (!inputText) return [inputText];
+                      
+                      const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+                      let lastIndex = 0;
+                      
+                      const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+                      let match;
+                      
+                      while ((match = combinedPattern.exec(inputText)) !== null) {
+                        if (match.index > lastIndex) {
+                          parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
+                        }
+                        
+                        if (match[1].startsWith('[[note:')) {
+                          parts.push({
+                            text: '',
+                            type: 'note',
+                            noteId: match[2],
+                            noteTitle: match[3],
+                          });
+                        } else if (match[1].startsWith('http')) {
+                          parts.push({ text: match[1], type: 'url' });
+                        } else if (match[1].startsWith('#')) {
+                          parts.push({ text: match[1], type: 'tag' });
+                        } else {
+                          parts.push({ text: match[1], type: 'text' });
+                        }
+                        
+                        lastIndex = match.index + match[0].length;
+                      }
+                      
+                      if (lastIndex < inputText.length) {
+                        parts.push({ text: inputText.substring(lastIndex), type: 'text' });
+                      }
+                      
+                      if (parts.length === 0) {
+                        parts.push({ text: inputText, type: 'text' });
+                      }
+                      
+                      return parts.map((part, idx) => {
+                        if (part.type === 'note' && part.noteId && part.noteTitle) {
+                          return (
+                            <span
+                              key={`note-ref-li-arr-${idx}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (onNavigateToNote) {
+                                  onNavigateToNote(part.noteId!);
+                                }
+                              }}
+                              className="note-reference-tag"
+                              title={`Click to open: ${part.noteTitle}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                cursor: onNavigateToNote ? 'pointer' : 'default',
+                                backgroundColor: 'rgba(232, 147, 95, 0.15)',
+                                color: 'rgb(232, 147, 95)',
+                                border: '1px solid rgba(232, 147, 95, 0.4)',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '0.375rem',
+                                fontSize: '0.875em',
+                                fontWeight: '500',
+                                transition: 'all 0.2s ease',
+                                margin: '0 0.2rem',
+                                whiteSpace: 'nowrap',
+                                verticalAlign: 'middle',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (onNavigateToNote) {
+                                  const target = e.currentTarget as HTMLElement;
+                                  target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
+                                  target.style.borderColor = 'rgba(232, 147, 95, 0.6)';
+                                  target.style.transform = 'translateY(-1px)';
+                                  target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                const target = e.currentTarget as HTMLElement;
+                                target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
+                                target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
+                                target.style.transform = 'translateY(0)';
+                                target.style.boxShadow = 'none';
+                              }}
+                            >
+                              <Book style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }} />
+                              {part.noteTitle}
+                            </span>
+                          );
+                        }
+                        
+                        if (part.type === 'url') {
+                          return (
+                            <a
+                              key={`url-li-arr-${idx}`}
+                              href={part.text}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="markdown-link"
+                              style={{
+                                display: 'inline',
+                                wordBreak: 'break-all',
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              {part.text}
+                            </a>
+                          );
+                        }
+                        
+                        if (part.type === 'tag') {
+                          return (
+                            <span
+                              key={`tag-li-arr-${idx}`}
+                              className="markdown-tag inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            >
+                              {part.text}
+                            </span>
+                          );
+                        }
+                        
+                        return <span key={`text-li-arr-${idx}`}>{part.text}</span>;
+                      });
+                    };
+                    
+                    return <React.Fragment key={index}>{processTextWithRefs(child)}</React.Fragment>;
+                  }
+                  if (child?.props?.node?.type === 'text' && child?.props?.node?.value) {
+                    // Recursively process text node values
+                    return <React.Fragment key={index}>{processChildren(child.props.node.value)}</React.Fragment>;
+                  }
+                  return child;
+                });
+              }
+              return children;
+            };
+            
+            return (
+              <li {...props}>
+                {processChildren(children)}
+              </li>
             );
           },
           td({ node, children, ...props }: any) {
@@ -576,13 +1019,13 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
         }
         .markdown-preview code:not(pre code),
         .markdown-preview .inline-code {
-          background-color: rgba(58, 68, 80, 0.9) !important;
-          color: rgb(236, 237, 238) !important;
+          background-color: var(--color-bg-secondary) !important;
+          color: var(--color-text-primary) !important;
           padding: 0.2rem 0.5rem !important;
           border-radius: 0.375rem !important;
           font-size: 0.875rem !important;
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
-          border: 1px solid rgba(75, 85, 99, 0.6) !important;
+          border: 1px solid var(--color-border) !important;
           font-weight: 450 !important;
           line-height: 1.5 !important;
           display: inline !important;
@@ -596,15 +1039,16 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
         .markdown-preview pre {
-          background-color: rgb(58, 68, 80);
-          color: rgb(209, 213, 219);
-          padding: 1rem;
+          background-color: var(--color-bg-secondary);
+          color: var(--color-text-primary);
+          padding: 0.75rem;
           border-radius: 0.5rem;
           overflow-x: hidden;
           overflow-wrap: break-word;
           word-wrap: break-word;
           white-space: pre-wrap;
           margin: 1rem 0;
+          border: none;
         }
         .markdown-preview pre code {
           background-color: transparent;
@@ -621,6 +1065,8 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
           word-wrap: break-word !important;
           white-space: pre-wrap !important;
           overflow-wrap: break-word !important;
+          background: var(--color-bg-secondary) !important;
+          background-color: var(--color-bg-secondary) !important;
         }
         .markdown-preview .code-block-wrapper pre {
           overflow-x: hidden !important;
@@ -639,16 +1085,25 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
         .markdown-preview .code-block-wrapper pre[class*="language-"],
         .markdown-preview .code-block-wrapper code[class*="language-"] {
           background: transparent !important;
-          color: #d1d5db !important;
+          color: var(--color-text-primary) !important;
         }
         .markdown-preview .code-block-wrapper > div[class*="language-"] {
+          background: var(--color-bg-secondary) !important;
+          background-color: var(--color-bg-secondary) !important;
+        }
+        .markdown-preview .code-block-wrapper > div[class*="language-"] > pre {
+          background: var(--color-bg-secondary) !important;
+          background-color: var(--color-bg-secondary) !important;
+        }
+        .markdown-preview .code-block-wrapper > div[class*="language-"] > pre > code {
           background: transparent !important;
+          background-color: transparent !important;
         }
         .markdown-preview .code-block-wrapper .token.comment,
         .markdown-preview .code-block-wrapper .token.prolog,
         .markdown-preview .code-block-wrapper .token.doctype,
         .markdown-preview .code-block-wrapper .token.cdata {
-          color: #9ca3af !important;
+          color: var(--color-text-tertiary) !important;
         }
         .markdown-preview .code-block-wrapper .token.string,
         .markdown-preview .code-block-wrapper .token.attr-value {
@@ -753,6 +1208,19 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
         }
         .markdown-preview task-list-item {
           list-style-type: none;
+        }
+        .markdown-preview .markdown-tag {
+          display: inline-flex !important;
+          align-items: center !important;
+          padding: 0.125rem 0.375rem !important;
+          margin: 0 0.125rem !important;
+          border-radius: 0.25rem !important;
+          font-size: 0.75rem !important;
+          font-weight: 500 !important;
+          background-color: rgba(59, 130, 246, 0.2) !important;
+          color: rgb(96, 165, 250) !important;
+          border: 1px solid rgba(59, 130, 246, 0.3) !important;
+          line-height: 1.5 !important;
         }
       `}</style>
     </div>

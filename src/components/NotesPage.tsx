@@ -19,7 +19,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'title' | 'date'>('date');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [lengthFilter, setLengthFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [folders, setFolders] = useState<string[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('All');
   const [showFolderDialog, setShowFolderDialog] = useState(false);
@@ -61,7 +61,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   useEffect(() => {
     filterAndSortNotes();
-  }, [notes, searchQuery, sortBy, selectedFolder, dateFilter, lengthFilter]);
+  }, [notes, searchQuery, sortBy, selectedFolder, dateFilter, tagFilter]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -110,6 +110,28 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   const handleFolderClick = (folderName: string) => {
     setSelectedFolder(folderName);
+  };
+
+  const extractTags = (text: string): string[] => {
+    // Match #tag patterns - word characters after #, allowing for tags at word boundaries
+    const tagRegex = /#(\w+)/g;
+    const matches = text.matchAll(tagRegex);
+    const tags = Array.from(matches, (match) => match[1].toLowerCase());
+    return [...new Set(tags)]; // Return unique tags
+  };
+
+  const getAllTags = (): string[] => {
+    const allTags = new Set<string>();
+    notes.forEach((note) => {
+      const tags = extractTags(note.title + ' ' + note.content);
+      tags.forEach((tag) => allTags.add(tag));
+    });
+    return Array.from(allTags).sort();
+  };
+
+  const noteHasTag = (note: Note, tag: string): boolean => {
+    const tags = extractTags(note.title + ' ' + note.content);
+    return tags.includes(tag.toLowerCase());
   };
 
   const organizeNotesByFolder = () => {
@@ -186,21 +208,9 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       });
     }
 
-    // Length filter
-    if (lengthFilter !== 'all') {
-      filtered = filtered.filter((note) => {
-        const length = note.content.length;
-        switch (lengthFilter) {
-          case 'short':
-            return length < 500;
-          case 'medium':
-            return length >= 500 && length <= 2000;
-          case 'long':
-            return length > 2000;
-          default:
-            return true;
-        }
-      });
+    // Tag filter
+    if (tagFilter !== 'all') {
+      filtered = filtered.filter((note) => noteHasTag(note, tagFilter));
     }
 
     filtered = [...filtered].sort((a, b) => {
@@ -555,7 +565,8 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
     text = text.replace(/^[-*_]{3,}$/gm, '');
     
     // Remove remaining markdown special characters (but keep pipes and colons for content)
-    text = text.replace(/[#`\[\]()]/g, '');
+    // IMPORTANT: Don't remove # as we want to preserve tags
+    text = text.replace(/[`\[\]()]/g, '');
     
     // Clean up extra whitespace
     text = text.replace(/\n{3,}/g, '\n\n');
@@ -565,6 +576,121 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
     if (!text || text.length === 0) return 'No content';
     
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  const renderPreviewWithTags = (content: string, maxLength: number = 100) => {
+    if (!content) return <span className="text-gray-500">No content</span>;
+    
+    // Convert markdown to plain text (similar to getPreview but preserve tags)
+    let text = content;
+    
+    // Handle markdown tables - extract text from table rows
+    text = text.replace(/\|(.+)\|/g, (_match, content: string) => {
+      if (content.match(/^[\s-:]+$/)) return '';
+      const cells = content.split('|').map((c: string) => c.trim()).filter((c: string) => c && !c.match(/^[-:]+$/));
+      return cells.join(' ');
+    });
+    
+    // Remove markdown headers (but preserve #tags)
+    text = text.replace(/^#{1,6}\s+(.+)$/gm, '$1');
+    
+    // Remove markdown links but keep the text
+    text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    
+    // Remove markdown images but keep alt text
+    text = text.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1');
+    
+    // Remove markdown code blocks
+    text = text.replace(/```[\s\S]*?```/g, '');
+    
+    // Remove inline code
+    text = text.replace(/`([^`]+)`/g, '$1');
+    
+    // Remove markdown lists markers
+    text = text.replace(/^[\s]*[-*+]\s+/gm, '');
+    text = text.replace(/^[\s]*\d+\.\s+/gm, '');
+    
+    // Remove markdown bold/italic markers
+    text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+    text = text.replace(/\*([^*]+)\*/g, '$1');
+    text = text.replace(/__([^_]+)__/g, '$1');
+    text = text.replace(/_([^_]+)_/g, '$1');
+    
+    // Remove markdown strikethrough
+    text = text.replace(/~~([^~]+)~~/g, '$1');
+    
+    // Remove markdown blockquotes
+    text = text.replace(/^>\s+/gm, '');
+    
+    // Remove horizontal rules
+    text = text.replace(/^[-*_]{3,}$/gm, '');
+    
+    // Remove remaining markdown special characters (but keep # for tags)
+    text = text.replace(/[`\[\]()]/g, '');
+    
+    // Clean up extra whitespace
+    text = text.replace(/\n{3,}/g, '\n\n');
+    text = text.replace(/\s+/g, ' ');
+    text = text.trim();
+    
+    if (!text || text.length === 0) return <span className="text-gray-500">No content</span>;
+    
+    // Check if we need to truncate
+    const needsTruncation = text.length > maxLength;
+    const displayText = needsTruncation ? text.substring(0, maxLength) : text;
+    
+    // Split text by tags while preserving the tags
+    const tagRegex = /(#\w+)/g;
+    const parts: Array<{ text: string; isTag: boolean }> = [];
+    let lastIndex = 0;
+    let match;
+    
+    // Reset regex lastIndex
+    tagRegex.lastIndex = 0;
+    
+    while ((match = tagRegex.exec(displayText)) !== null) {
+      // Add text before tag
+      if (match.index > lastIndex) {
+        parts.push({ text: displayText.substring(lastIndex, match.index), isTag: false });
+      }
+      // Add tag
+      parts.push({ text: match[0], isTag: true });
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text after last tag
+    if (lastIndex < displayText.length) {
+      parts.push({ text: displayText.substring(lastIndex), isTag: false });
+    }
+    
+    // If no tags found, return plain text
+    if (parts.length === 0) {
+      return (
+        <span>
+          {displayText}
+          {needsTruncation && '...'}
+        </span>
+      );
+    }
+    
+    return (
+      <span>
+        {parts.map((part, index) => {
+          if (part.isTag) {
+            return (
+              <span
+                key={index}
+                className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30"
+              >
+                {part.text}
+              </span>
+            );
+          }
+          return <span key={index}>{part.text}</span>;
+        })}
+        {needsTruncation && '...'}
+      </span>
+    );
   };
 
   const { organized, unfiled } = organizeNotesByFolder();
@@ -879,18 +1005,18 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                         <option value="month">This Month</option>
                       </select>
                     </div>
-                    {/* Length Filter */}
+                    {/* Tag Filter */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">Length:</span>
+                      <span className="text-xs text-gray-500">Tag:</span>
                       <select
-                        value={lengthFilter}
-                        onChange={(e) => setLengthFilter(e.target.value as 'all' | 'short' | 'medium' | 'long')}
+                        value={tagFilter}
+                        onChange={(e) => setTagFilter(e.target.value)}
                         className="text-xs bg-theme-bg-secondary border border-theme-border rounded px-2 py-1 text-theme-text-secondary hover:text-theme-text-primary focus:outline-none focus:border-gray-600 transition-colors"
                       >
-                        <option value="all">All</option>
-                        <option value="short">Short (&lt;500)</option>
-                        <option value="medium">Medium (500-2000)</option>
-                        <option value="long">Long (&gt;2000)</option>
+                        <option value="all">All Tags</option>
+                        {getAllTags().map((tag) => (
+                          <option key={tag} value={tag}>#{tag}</option>
+                        ))}
                       </select>
                     </div>
                     {/* Sort By */}
@@ -932,9 +1058,9 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                           <h4 className="text-lg text-theme-text-primary group-hover:text-white transition-colors mb-2">
                             {note.title}
                           </h4>
-                          <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-                            {getPreview(note.content)}
-                          </p>
+                          <div className="text-sm text-gray-500 mb-3 line-clamp-2">
+                            {renderPreviewWithTags(note.content)}
+                          </div>
                           <div className="flex items-center gap-4 text-sm text-gray-500">
                             <span>{formatDate(note.updated_at)}</span>
                             <span>{note.content.length} characters</span>
