@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Key, Info, Folder, FolderOpen, AlertCircle, Database, Palette, Cloud, Upload, Download, Check, BookOpen, ChevronDown, ChevronUp, AlertTriangle, Trash2 } from 'lucide-react';
+import { X, Key, Info, Folder, FolderOpen, AlertCircle, Database, Palette, Cloud, Upload, Download, Check, BookOpen, ChevronDown, ChevronUp, AlertTriangle, Trash2, GitMerge } from 'lucide-react';
 import JSZip from 'jszip';
 import { getGeminiApiKey, saveGeminiApiKey, deleteGeminiApiKey } from '../lib/geminiStorage';
 import { getFolderPath, requestDirectoryAccess, setDirectoryHandle, clearDirectoryHandle, isFileSystemSupported, isFolderConfigured, hasDirectoryAccess, restoreDirectoryAccess } from '../lib/fileSystemStorage';
-import { refreshStorage } from '../lib/storage';
-import { refreshFlowStorage } from '../lib/flowStorage';
+import { refreshStorage, getNotes, Note, writeAll } from '../lib/storage';
+import { refreshFlowStorage, getFlows, Flow, writeAll as writeAllFlows } from '../lib/flowStorage';
 import { getTheme, saveTheme, applyTheme, Theme } from '../lib/themeStorage';
 import { getCloudConfig, saveCloudConfig, clearCloudConfig, uploadToCloud, downloadFromCloud, saveDownloadedData, validateCloudConfig, CloudConfig } from '../lib/cloudSync';
 import Toast from './Toast';
@@ -360,6 +360,179 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
       console.error('Error downloading from cloud:', error);
       setToast({ 
         message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
+        type: 'error' 
+      });
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(0);
+    }
+  };
+
+  const handleDownloadMerge = async () => {
+    setShowDownloadDialog(false);
+    setIsDownloading(true);
+    setDownloadProgress(0);
+
+    try {
+      // Get stored selections if available
+      const selections = (window as any).__pendingDownloadSelections || { selectedNotes: undefined, selectedFlows: undefined };
+      delete (window as any).__pendingDownloadSelections;
+
+      if (!selections.selectedNotes || selections.selectedNotes.length === 0) {
+        if (!selections.selectedFlows || selections.selectedFlows.length === 0) {
+          setToast({ message: 'Please select at least one note or flow to merge', type: 'error' });
+          return;
+        }
+      }
+
+      // Download selected data from cloud
+      const data = await downloadFromCloud(
+        cloudConfig, 
+        (progress) => {
+          setDownloadProgress(Math.round(progress * 0.5)); // First 50% is downloading
+        },
+        selections.selectedNotes,
+        selections.selectedFlows
+      );
+
+      if (Object.keys(data).length === 0) {
+        setToast({ 
+          message: 'No data found in cloud. The cloud storage appears to be empty.', 
+          type: 'error' 
+        });
+        return;
+      }
+
+      setDownloadProgress(60);
+
+      // Merge notes
+      if (data['notes.json']) {
+        try {
+          const downloadedNotes: Note[] = JSON.parse(data['notes.json']);
+          const localNotes = getNotes();
+          
+          // Merge by ID: update existing, add new
+          const notesMap = new Map<string, Note>();
+          localNotes.forEach(note => notesMap.set(note.id, note));
+          
+          let mergedCount = 0;
+          let addedCount = 0;
+          
+          downloadedNotes.forEach((note: Note) => {
+            if (notesMap.has(note.id)) {
+              // Update existing note
+              notesMap.set(note.id, note);
+              mergedCount++;
+            } else {
+              // Add new note
+              notesMap.set(note.id, note);
+              addedCount++;
+            }
+          });
+
+          // Save all merged notes at once
+          const mergedNotes = Array.from(notesMap.values());
+          writeAll(mergedNotes);
+          // Wait a bit for async write to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          console.log(`Merged notes: ${mergedCount} updated, ${addedCount} added`);
+        } catch (e) {
+          console.warn('Error merging notes:', e);
+        }
+      }
+
+      setDownloadProgress(75);
+
+      // Merge flows
+      if (data['flows.json']) {
+        try {
+          const downloadedFlows: Flow[] = JSON.parse(data['flows.json']);
+          const localFlows = getFlows();
+          
+          // Merge by ID: update existing, add new
+          const flowsMap = new Map<string, Flow>();
+          localFlows.forEach(flow => flowsMap.set(flow.id, flow));
+          
+          let mergedCount = 0;
+          let addedCount = 0;
+          
+          downloadedFlows.forEach((flow: Flow) => {
+            if (flowsMap.has(flow.id)) {
+              // Update existing flow
+              flowsMap.set(flow.id, flow);
+              mergedCount++;
+            } else {
+              // Add new flow
+              flowsMap.set(flow.id, flow);
+              addedCount++;
+            }
+          });
+
+          // Save all merged flows at once
+          const mergedFlows = Array.from(flowsMap.values());
+          writeAllFlows(mergedFlows);
+          // Wait a bit for async write to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          console.log(`Merged flows: ${mergedCount} updated, ${addedCount} added`);
+        } catch (e) {
+          console.warn('Error merging flows:', e);
+        }
+      }
+
+      setDownloadProgress(90);
+
+      // Merge folders and categories if present
+      if (data['folders.json']) {
+        try {
+          const downloadedFolders: string[] = JSON.parse(data['folders.json']);
+          const localFolders = getNotes().map(n => n.folder).filter(Boolean) as string[];
+          const mergedFolders = Array.from(new Set([...localFolders, ...downloadedFolders]));
+          // Folders are managed automatically when notes are saved, so we don't need to save separately
+        } catch (e) {
+          console.warn('Error merging folders:', e);
+        }
+      }
+
+      if (data['flowCategories.json']) {
+        try {
+          const downloadedCategories: string[] = JSON.parse(data['flowCategories.json']);
+          const localCategories = getFlows().map(f => f.category).filter(Boolean) as string[];
+          const mergedCategories = Array.from(new Set([...localCategories, ...downloadedCategories]));
+          // Categories are managed automatically when flows are saved
+        } catch (e) {
+          console.warn('Error merging categories:', e);
+        }
+      }
+
+      // Refresh storage to ensure everything is loaded
+      await refreshStorage();
+      await refreshFlowStorage();
+      
+      // Trigger storage refresh event
+      window.dispatchEvent(new CustomEvent('storage-refresh'));
+      
+      if (onFolderChange) {
+        onFolderChange();
+      }
+
+      setDownloadProgress(100);
+
+      const noteCount = selections.selectedNotes?.length || 0;
+      const flowCount = selections.selectedFlows?.length || 0;
+      const items = [];
+      if (noteCount > 0) items.push(`${noteCount} note${noteCount !== 1 ? 's' : ''}`);
+      if (flowCount > 0) items.push(`${flowCount} flow${flowCount !== 1 ? 's' : ''}`);
+      
+      setToast({ 
+        message: `Successfully merged ${items.join(' and ')} with local data!`, 
+        type: 'success' 
+      });
+    } catch (error) {
+      console.error('Error merging from cloud:', error);
+      setToast({ 
+        message: `Merge failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         type: 'error' 
       });
     } finally {
@@ -1104,6 +1277,23 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
                       <div className="font-medium text-theme-text-primary mb-1">Download as ZIP</div>
                       <div className="text-xs text-theme-text-secondary">
                         Downloads all files as a ZIP archive. Extract it to a folder and select that folder in Storage settings to use the data.
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleDownloadMerge}
+                  className="w-full p-4 bg-theme-bg-darkest border-2 border-theme-border hover:border-green-500/50 rounded-lg transition-all text-left group"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-green-500/30 transition-colors">
+                      <GitMerge className="w-4 h-4 text-green-400" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-theme-text-primary mb-1">Merge Selected Docs</div>
+                      <div className="text-xs text-theme-text-secondary">
+                        Merges selected notes and flows with your local data. Updates existing items and adds new ones without removing anything.
                       </div>
                     </div>
                   </div>
