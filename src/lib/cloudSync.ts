@@ -215,6 +215,103 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
 }
 
 /**
+ * Download a specific file from Firebase Realtime Database
+ * @param config Cloud configuration
+ * @param dataPath Path to the data (e.g., "users/{userId}")
+ * @param dbName Name of the database entry (e.g., "notes", "flows")
+ * @returns The parsed content or null if not found
+ */
+export async function downloadFileFromCloud(
+  config: CloudConfig,
+  dataPath: string,
+  dbName: string
+): Promise<any | null> {
+  const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
+  const downloadUrls = [
+    ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json?auth=${config.apiKey}`),
+    `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json?auth=${config.apiKey}`,
+  ];
+
+  for (const url of downloadUrls) {
+    try {
+      let response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data === null) {
+          return null; // File doesn't exist
+        }
+        
+        // Extract content from Realtime Database structure
+        if (data && typeof data === 'object' && data !== null) {
+          if (data.content !== undefined) {
+            return data.content;
+          } else if (Object.keys(data).length > 0) {
+            return data;
+          }
+        }
+        return data;
+      } else if (response.status === 401 || response.status === 403) {
+        // Try without auth
+        const publicUrl = url.replace('?auth=' + config.apiKey, '');
+        response = await fetch(publicUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data === null) {
+            return null;
+          }
+          if (data && typeof data === 'object' && data !== null) {
+            if (data.content !== undefined) {
+              return data.content;
+            } else if (Object.keys(data).length > 0) {
+              return data;
+            }
+          }
+          return data;
+        }
+      }
+    } catch (err) {
+      continue; // Try next URL
+    }
+  }
+  
+  return null; // Not found
+}
+
+/**
+ * Merge arrays of items by ID, updating existing items and adding new ones
+ * @param existingItems Existing items from cloud
+ * @param newItems New items to merge
+ * @returns Merged array
+ */
+function mergeItemsById(existingItems: any[], newItems: any[]): any[] {
+  if (!Array.isArray(existingItems)) {
+    existingItems = [];
+  }
+  if (!Array.isArray(newItems)) {
+    newItems = [];
+  }
+
+  // Create a map of existing items by ID
+  const existingMap = new Map<string, any>();
+  existingItems.forEach((item: any) => {
+    if (item && item.id) {
+      existingMap.set(item.id, item);
+    }
+  });
+
+  // Update or add new items
+  newItems.forEach((item: any) => {
+    if (item && item.id) {
+      existingMap.set(item.id, item); // This will update existing or add new
+    }
+  });
+
+  // Convert back to array
+  return Array.from(existingMap.values());
+}
+
+/**
  * Upload data to Firebase Realtime Database
  * @param config Cloud configuration
  * @param onProgress Optional progress callback
@@ -229,13 +326,6 @@ export async function uploadToCloud(
 ): Promise<void> {
   if (!config.apiKey || !config.projectId) {
     throw new Error('Cloud configuration is incomplete');
-  }
-
-  // Get all data files (filtered if selections provided)
-  const dataFiles = await getAllDataFiles(selectedNoteIds, selectedFlowIds);
-  
-  if (dataFiles.length === 0) {
-    throw new Error('No data to sync');
   }
 
   // Create a timestamp for this sync
@@ -284,8 +374,133 @@ export async function uploadToCloud(
   
   const dataPath = `users/${targetUserId}`;
 
+  // Download existing data from cloud for merging
+  if (onProgress) {
+    onProgress(5); // Initial progress
+  }
+
+  let existingNotes: any[] = [];
+  let existingFlows: any[] = [];
+  let existingFolders: string[] = [];
+  let existingCategories: string[] = [];
+
+  try {
+    const existingNotesData = await downloadFileFromCloud(config, dataPath, 'notes');
+    if (existingNotesData && Array.isArray(existingNotesData)) {
+      existingNotes = existingNotesData;
+    } else if (existingNotesData && typeof existingNotesData === 'object') {
+      // Might be wrapped, try to extract
+      existingNotes = Array.isArray(existingNotesData) ? existingNotesData : [];
+    }
+
+    const existingFlowsData = await downloadFileFromCloud(config, dataPath, 'flows');
+    if (existingFlowsData && Array.isArray(existingFlowsData)) {
+      existingFlows = existingFlowsData;
+    } else if (existingFlowsData && typeof existingFlowsData === 'object') {
+      existingFlows = Array.isArray(existingFlowsData) ? existingFlowsData : [];
+    }
+
+    const existingFoldersData = await downloadFileFromCloud(config, dataPath, 'folders');
+    if (existingFoldersData && Array.isArray(existingFoldersData)) {
+      existingFolders = existingFoldersData;
+    }
+
+    const existingCategoriesData = await downloadFileFromCloud(config, dataPath, 'flowCategories');
+    if (existingCategoriesData && Array.isArray(existingCategoriesData)) {
+      existingCategories = existingCategoriesData;
+    }
+  } catch (error) {
+    console.warn('Error downloading existing data for merge, will proceed with upload only:', error);
+    // Continue with upload - this might be the first sync
+  }
+
+  if (onProgress) {
+    onProgress(15); // After downloading existing data
+  }
+
+  // Get local data files (filtered if selections provided)
+  const dataFiles = await getAllDataFiles(selectedNoteIds, selectedFlowIds);
+  
+  if (dataFiles.length === 0) {
+    throw new Error('No data to sync');
+  }
+
+  // Merge notes - always merge to preserve existing notes in cloud
+  const notesFile = dataFiles.find(f => f.name === 'notes.json');
+  if (notesFile) {
+    try {
+      const localNotes = JSON.parse(notesFile.content);
+      if (Array.isArray(localNotes)) {
+        // Merge: update existing notes and add new ones, but keep all existing notes
+        const mergedNotes = mergeItemsById(existingNotes, localNotes);
+        notesFile.content = JSON.stringify(mergedNotes);
+        console.log(`Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`);
+      }
+    } catch (e) {
+      console.warn('Error merging notes:', e);
+    }
+  } else if (existingNotes.length > 0) {
+    // If no local notes file but we have existing notes in cloud, preserve them
+    dataFiles.push({ name: 'notes.json', content: JSON.stringify(existingNotes) });
+  }
+
+  // Merge flows - always merge to preserve existing flows in cloud
+  const flowsFile = dataFiles.find(f => f.name === 'flows.json');
+  if (flowsFile) {
+    try {
+      const localFlows = JSON.parse(flowsFile.content);
+      if (Array.isArray(localFlows)) {
+        // Merge: update existing flows and add new ones, but keep all existing flows
+        const mergedFlows = mergeItemsById(existingFlows, localFlows);
+        flowsFile.content = JSON.stringify(mergedFlows);
+        console.log(`Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`);
+      }
+    } catch (e) {
+      console.warn('Error merging flows:', e);
+    }
+  } else if (existingFlows.length > 0) {
+    // If no local flows file but we have existing flows in cloud, preserve them
+    dataFiles.push({ name: 'flows.json', content: JSON.stringify(existingFlows) });
+  }
+
+  // Merge folders and categories (always merge, not replace)
+  const foldersFile = dataFiles.find(f => f.name === 'folders.json');
+  if (foldersFile) {
+    try {
+      const localFolders = JSON.parse(foldersFile.content);
+      if (Array.isArray(localFolders)) {
+        const mergedFolders = Array.from(new Set([...existingFolders, ...localFolders]));
+        foldersFile.content = JSON.stringify(mergedFolders);
+      }
+    } catch (e) {
+      console.warn('Error merging folders:', e);
+    }
+  } else if (existingFolders.length > 0) {
+    dataFiles.push({ name: 'folders.json', content: JSON.stringify(existingFolders) });
+  }
+
+  const categoriesFile = dataFiles.find(f => f.name === 'flowCategories.json');
+  if (categoriesFile) {
+    try {
+      const localCategories = JSON.parse(categoriesFile.content);
+      if (Array.isArray(localCategories)) {
+        const mergedCategories = Array.from(new Set([...existingCategories, ...localCategories]));
+        categoriesFile.content = JSON.stringify(mergedCategories);
+      }
+    } catch (e) {
+      console.warn('Error merging categories:', e);
+    }
+  } else if (existingCategories.length > 0) {
+    dataFiles.push({ name: 'flowCategories.json', content: JSON.stringify(existingCategories) });
+  }
+
+  if (onProgress) {
+    onProgress(25); // After merging
+  }
+
   // Upload each file to Realtime Database
   let uploadedCount = 0;
+  const totalFiles = dataFiles.length;
   
   for (const file of dataFiles) {
     try {
@@ -382,7 +597,9 @@ export async function uploadToCloud(
 
       uploadedCount++;
       if (onProgress) {
-        onProgress(Math.round((uploadedCount / dataFiles.length) * 100));
+        // Progress from 25% to 95% (uploading files)
+        const uploadProgress = 25 + Math.round((uploadedCount / totalFiles) * 70);
+        onProgress(uploadProgress);
       }
     } catch (error) {
       console.error(`Error uploading ${file.name}:`, error);
@@ -397,6 +614,10 @@ export async function uploadToCloud(
   }
 
   // Save sync metadata (use the same targetUserId we used for uploads)
+  if (onProgress) {
+    onProgress(95); // Before saving metadata
+  }
+
   try {
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const metadataUrls = [
@@ -443,12 +664,25 @@ export async function uploadToCloud(
   } catch (error) {
     console.warn('Could not save metadata, but files were uploaded successfully');
   }
+
+  if (onProgress) {
+    onProgress(100); // Complete
+  }
 }
 
 /**
  * Download data from Firebase Realtime Database
+ * @param config Cloud configuration
+ * @param onProgress Optional progress callback
+ * @param selectedNoteIds Optional array of note IDs to download. If not provided, all notes are downloaded.
+ * @param selectedFlowIds Optional array of flow IDs to download. If not provided, all flows are downloaded.
  */
-export async function downloadFromCloud(config: CloudConfig, onProgress?: (percent: number) => void): Promise<{ [key: string]: string }> {
+export async function downloadFromCloud(
+  config: CloudConfig, 
+  onProgress?: (percent: number) => void,
+  selectedNoteIds?: string[],
+  selectedFlowIds?: string[]
+): Promise<{ [key: string]: string }> {
   if (!config.apiKey || !config.projectId) {
     throw new Error('Cloud configuration is incomplete');
   }
@@ -608,6 +842,31 @@ export async function downloadFromCloud(config: CloudConfig, onProgress?: (perce
         }
         
         if (fileContent !== null) {
+          // Filter notes or flows if selections are provided
+          if (dbName === 'notes' && selectedNoteIds !== undefined) {
+            try {
+              const notes = JSON.parse(fileContent);
+              if (Array.isArray(notes)) {
+                const filteredNotes = notes.filter((note: any) => selectedNoteIds.includes(note.id));
+                fileContent = JSON.stringify(filteredNotes);
+                console.log(`Filtered notes: ${notes.length} total, ${filteredNotes.length} selected`);
+              }
+            } catch (e) {
+              console.warn('Error filtering notes:', e);
+            }
+          } else if (dbName === 'flows' && selectedFlowIds !== undefined) {
+            try {
+              const flows = JSON.parse(fileContent);
+              if (Array.isArray(flows)) {
+                const filteredFlows = flows.filter((flow: any) => selectedFlowIds.includes(flow.id));
+                fileContent = JSON.stringify(filteredFlows);
+                console.log(`Filtered flows: ${flows.length} total, ${filteredFlows.length} selected`);
+              }
+            } catch (e) {
+              console.warn('Error filtering flows:', e);
+            }
+          }
+
           const fileName = `${dbName}.json`;
           downloadedFiles[fileName] = fileContent;
           
@@ -692,7 +951,7 @@ export async function saveDownloadedData(data: { [key: string]: string }): Promi
 /**
  * Get or create a unique user ID for cloud storage
  */
-function getUserId(): string {
+export function getUserId(): string {
   let userId = localStorage.getItem('pinn.cloudUserId');
   
   if (!userId) {

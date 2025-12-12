@@ -9,6 +9,7 @@ import { getTheme, saveTheme, applyTheme, Theme } from '../lib/themeStorage';
 import { getCloudConfig, saveCloudConfig, clearCloudConfig, uploadToCloud, downloadFromCloud, saveDownloadedData, validateCloudConfig, CloudConfig } from '../lib/cloudSync';
 import Toast from './Toast';
 import SyncSelectionDialog from './SyncSelectionDialog';
+import DownloadSelectionDialog from './DownloadSelectionDialog';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
   const [expandedTroubleshooting, setExpandedTroubleshooting] = useState<string | null>(null);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [showSyncSelectionDialog, setShowSyncSelectionDialog] = useState(false);
+  const [showDownloadSelectionDialog, setShowDownloadSelectionDialog] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -260,7 +262,6 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
       
       const noteCount = selectedNotes.length;
       const flowCount = selectedFlows.length;
-      const itemCount = noteCount + flowCount;
       const items = [];
       if (noteCount > 0) items.push(`${noteCount} note${noteCount !== 1 ? 's' : ''}`);
       if (flowCount > 0) items.push(`${flowCount} flow${flowCount !== 1 ? 's' : ''}`);
@@ -287,8 +288,20 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
       return;
     }
 
-    // Show confirmation dialog
+    // Show selection dialog first
+    setShowDownloadSelectionDialog(true);
+  };
+
+  const handleDownloadSelected = async (selectedNotes: string[], selectedFlows: string[]) => {
+    if (selectedNotes.length === 0 && selectedFlows.length === 0) {
+      setToast({ message: 'Please select at least one note or flow to download', type: 'error' });
+      return;
+    }
+
+    // Show confirmation dialog for replace vs ZIP
     setShowDownloadDialog(true);
+    // Store selections temporarily (we'll use them in the download handlers)
+    (window as any).__pendingDownloadSelections = { selectedNotes, selectedFlows };
   };
 
   const handleDownloadReplace = async () => {
@@ -297,9 +310,18 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
     setDownloadProgress(0);
 
     try {
-      const data = await downloadFromCloud(cloudConfig, (progress) => {
-        setDownloadProgress(progress);
-      });
+      // Get stored selections if available
+      const selections = (window as any).__pendingDownloadSelections || { selectedNotes: undefined, selectedFlows: undefined };
+      delete (window as any).__pendingDownloadSelections;
+
+      const data = await downloadFromCloud(
+        cloudConfig, 
+        (progress) => {
+          setDownloadProgress(progress);
+        },
+        selections.selectedNotes,
+        selections.selectedFlows
+      );
       
       console.log('Downloaded data:', Object.keys(data), data);
       
@@ -324,7 +346,16 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         onFolderChange();
       }
       
-      setToast({ message: `Successfully downloaded and replaced ${Object.keys(data).length} file(s)!`, type: 'success' });
+      const noteCount = selections.selectedNotes?.length || 0;
+      const flowCount = selections.selectedFlows?.length || 0;
+      const items = [];
+      if (noteCount > 0) items.push(`${noteCount} note${noteCount !== 1 ? 's' : ''}`);
+      if (flowCount > 0) items.push(`${flowCount} flow${flowCount !== 1 ? 's' : ''}`);
+      
+      setToast({ 
+        message: `Successfully downloaded and replaced ${items.length > 0 ? items.join(' and ') : Object.keys(data).length + ' file(s)'}!`, 
+        type: 'success' 
+      });
     } catch (error) {
       console.error('Error downloading from cloud:', error);
       setToast({ 
@@ -344,10 +375,19 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
     setDownloadProgress(0);
 
     try {
+      // Get stored selections if available
+      const selections = (window as any).__pendingDownloadSelections || { selectedNotes: undefined, selectedFlows: undefined };
+      delete (window as any).__pendingDownloadSelections;
+
       // Download data from cloud
-      const data = await downloadFromCloud(cloudConfig, (progress) => {
-        setDownloadProgress(Math.round(progress * 0.5)); // First 50% is downloading
-      });
+      const data = await downloadFromCloud(
+        cloudConfig, 
+        (progress) => {
+          setDownloadProgress(Math.round(progress * 0.5)); // First 50% is downloading
+        },
+        selections.selectedNotes,
+        selections.selectedFlows
+      );
 
       console.log('Downloaded data for ZIP:', Object.keys(data), data);
 
@@ -1089,6 +1129,14 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         isOpen={showSyncSelectionDialog}
         onClose={() => setShowSyncSelectionDialog(false)}
         onConfirm={handleSyncSelected}
+      />
+
+      {/* Download Selection Dialog */}
+      <DownloadSelectionDialog
+        isOpen={showDownloadSelectionDialog}
+        onClose={() => setShowDownloadSelectionDialog(false)}
+        onConfirm={handleDownloadSelected}
+        cloudConfig={cloudConfig}
       />
 
       {/* Documentation Dialog */}
