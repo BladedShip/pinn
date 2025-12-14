@@ -4,15 +4,16 @@ import EditorPage from './components/EditorPage';
 import FlowsPage from './components/FlowsPage';
 import FlowPage from './components/FlowPage';
 import NotesPage from './components/NotesPage';
+import NotFoundPage from './components/NotFoundPage';
 import OnboardingDialog from './components/OnboardingDialog';
 import { Bookmark, Folder, X, AlertCircle, Check } from 'lucide-react';
 import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, hasValidDirectoryAccess, restoreDirectoryAccess, getFolderPath } from './lib/fileSystemStorage';
-import { initStorage, refreshStorage } from './lib/storage';
-import { initFlowStorage, refreshFlowStorage } from './lib/flowStorage';
+import { initStorage, refreshStorage, getNoteById } from './lib/storage';
+import { initFlowStorage, refreshFlowStorage, getFlowById } from './lib/flowStorage';
 import { initializeTheme, applyTheme } from './lib/themeStorage';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'editor' | 'flows' | 'flow' | 'notes'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'editor' | 'flows' | 'flow' | 'notes' | 'notfound'>('home');
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -24,24 +25,43 @@ function App() {
   // Parse URL to determine current view and note ID
   const parseURL = () => {
     const path = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
     
-    if (path.startsWith('/note/')) {
+    // Valid routes: /, /notes, /flows, /note/:id, /note/new, /flow/:id
+    if (path === '/') {
+      return { view: 'home' as const, noteId: null, flowId: null };
+    } else if (path.startsWith('/note/')) {
       const noteId = path.split('/note/')[1];
       // Handle /note/new as a new note (editor view with null noteId)
       if (noteId === 'new') {
-        return { view: 'editor' as const, noteId: null };
+        return { view: 'editor' as const, noteId: null, flowId: null };
       }
-      return { view: 'editor' as const, noteId };
+      // Validate that note exists
+      if (noteId && noteId.trim() !== '') {
+        const note = getNoteById(noteId);
+        if (!note) {
+          return { view: 'notfound' as const, noteId: null, flowId: null };
+        }
+        return { view: 'editor' as const, noteId, flowId: null };
+      }
+      return { view: 'notfound' as const, noteId: null, flowId: null };
     } else if (path === '/notes') {
-      return { view: 'notes' as const, noteId: null };
+      return { view: 'notes' as const, noteId: null, flowId: null };
     } else if (path === '/flows') {
-      return { view: 'flows' as const, noteId: null };
+      return { view: 'flows' as const, noteId: null, flowId: null };
     } else if (path.startsWith('/flow/')) {
       const flowId = path.split('/flow/')[1];
-      return { view: 'flow' as const, flowId };
+      // Validate that flow exists
+      if (flowId && flowId.trim() !== '') {
+        const flow = getFlowById(flowId);
+        if (!flow) {
+          return { view: 'notfound' as const, noteId: null, flowId: null };
+        }
+        return { view: 'flow' as const, noteId: null, flowId };
+      }
+      return { view: 'notfound' as const, noteId: null, flowId: null };
     }
-    return { view: 'home' as const, noteId: null };
+    // Any other path is 404
+    return { view: 'notfound' as const, noteId: null, flowId: null };
   };
 
   // Handle browser back/forward navigation
@@ -367,8 +387,10 @@ function App() {
               <FlowsPage onNavigateToFlow={navigateToFlow} onNavigateToHome={navigateToHome} onNavigateToNotes={navigateToNotes} />
             ) : currentView === 'notes' ? (
               <NotesPage onNavigateToEditor={navigateToEditor} onNavigateToHome={navigateToHome} onNavigateToFlows={navigateToFlows} />
-            ) : (
+            ) : currentView === 'flow' ? (
               <FlowPage flowId={currentFlowId} onNavigateToHome={navigateToHome} onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} />
+            ) : (
+              <NotFoundPage onNavigateToHome={navigateToHome} />
             )}
           </div>
         </>
