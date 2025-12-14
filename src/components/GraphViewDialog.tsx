@@ -823,19 +823,25 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                         className="w-full bg-theme-bg-primary border border-theme-border rounded-lg pl-9 pr-3 py-2 text-sm text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-[#e8935f]/50"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center justify-between cursor-pointer" onClick={() => setShowTags(!showTags)}>
-                        <span className="text-sm text-theme-text-secondary">Tags</span>
-                        <div className={`relative w-10 h-5 rounded-full transition-colors ${showTags ? 'bg-[#8B5CF6]' : 'bg-gray-600'}`}>
-                          <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showTags ? 'translate-x-5' : ''}`}></div>
-                        </div>
-                      </label>
-                      <label className="flex items-center justify-between cursor-pointer" onClick={() => setShowFolders(!showFolders)}>
-                        <span className="text-sm text-theme-text-secondary">Folders</span>
-                        <div className={`relative w-10 h-5 rounded-full transition-colors ${showFolders ? 'bg-[#8B5CF6]' : 'bg-gray-600'}`}>
-                          <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showFolders ? 'translate-x-5' : ''}`}></div>
-                        </div>
-                      </label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="flex items-center justify-between cursor-pointer" onClick={() => setShowTags(!showTags)}>
+                          <span className="text-sm text-theme-text-secondary">Tags</span>
+                          <div className={`relative w-10 h-5 rounded-full transition-colors ${showTags ? 'bg-[#8B5CF6]' : 'bg-gray-600'}`}>
+                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showTags ? 'translate-x-5' : ''}`}></div>
+                          </div>
+                        </label>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Show or hide tag nodes in the graph</p>
+                      </div>
+                      <div>
+                        <label className="flex items-center justify-between cursor-pointer" onClick={() => setShowFolders(!showFolders)}>
+                          <span className="text-sm text-theme-text-secondary">Folders</span>
+                          <div className={`relative w-10 h-5 rounded-full transition-colors ${showFolders ? 'bg-[#8B5CF6]' : 'bg-gray-600'}`}>
+                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showFolders ? 'translate-x-5' : ''}`}></div>
+                          </div>
+                        </label>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Show or hide folder nodes in the graph</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -908,7 +914,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                 {expandedSections.display && (
                   <div className="mt-3 space-y-4">
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Text fade threshold</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Text fade threshold</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Controls when labels fade based on zoom level</p>
                       <input
                         type="range"
                         min="0"
@@ -929,7 +936,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
                     
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Node Repulsion</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Node Repulsion</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Controls how strongly nodes push away from each other</p>
                       <input
                         type="range"
                         min="-20000"
@@ -950,7 +958,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
                     
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Spring Length</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Spring Length</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Base distance between connected nodes</p>
                       <input
                         type="range"
                         min="50"
@@ -971,7 +980,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
                     
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Spring Constant</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Spring Constant</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Strength of connections between nodes</p>
                       <input
                         type="range"
                         min="0.001"
@@ -992,7 +1002,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
                     
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Node Distance</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Node Distance</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Distance between notes and their folders</p>
                       <input
                         type="range"
                         min="200"
@@ -1013,7 +1024,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
                     
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Avoid Overlap</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Avoid Overlap</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Prevents nodes from overlapping each other</p>
                       <input
                         type="range"
                         min="0.5"
@@ -1034,7 +1046,8 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     </div>
 
                     <div>
-                      <label className="text-xs text-theme-text-secondary mb-2 block">Edge Curve</label>
+                      <label className="text-xs text-theme-text-secondary mb-1 block">Edge Curve</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Controls the curvature of connection lines</p>
                       <input
                         type="range"
                         min="0"
@@ -1056,6 +1069,7 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                     
                     <div className="space-y-2">
                       <label className="text-xs text-theme-text-secondary block">Node Sizes</label>
+                      <p className="text-xs text-theme-text-tertiary mb-2">Adjust the size of different node types</p>
                       <div className="space-y-2">
                         <div>
                           <label className="text-xs text-theme-text-tertiary mb-1 block">Folder: {nodeSize.folder}</label>
