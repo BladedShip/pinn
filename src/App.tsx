@@ -4,9 +4,10 @@ import HomePage from './components/HomePage';
 import EditorPage from './components/EditorPage';
 import FlowsPage from './components/FlowsPage';
 import NotesPage from './components/NotesPage';
+import TrashPage from './components/TrashPage';
 import NotFoundPage from './components/NotFoundPage';
 import OnboardingDialog from './components/OnboardingDialog';
-import LoadingSpinner from './components/shared/LoadingSpinner';
+import LoadingScreen from './components/LoadingScreen';
 import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, hasValidDirectoryAccess, restoreDirectoryAccess, getFolderPath } from './lib/fileSystemStorage';
 import { initStorage, refreshStorage, getNoteById } from './lib/storage';
 import { initFlowStorage, refreshFlowStorage, getFlowById } from './lib/flowStorage';
@@ -17,12 +18,14 @@ import { logger } from './utils/logger';
 const FlowPage = lazy(() => import('./components/FlowPage'));
 
 function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'editor' | 'flows' | 'flow' | 'notes' | 'notfound'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'editor' | 'flows' | 'flow' | 'notes' | 'trash' | 'notfound'>('home');
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [loadingStep, setLoadingStep] = useState<string>('theme');
+  const [loadingSubMessage, setLoadingSubMessage] = useState<string>('');
   const [needsPermissionRestore, setNeedsPermissionRestore] = useState(false);
   const [isRestoringPermission, setIsRestoringPermission] = useState(false);
 
@@ -30,9 +33,11 @@ function App() {
   const parseURL = () => {
     const path = window.location.pathname;
     
-    // Valid routes: /, /notes, /flows, /note/:id, /note/new, /flow/:id
+    // Valid routes: /, /notes, /flows, /trash, /note/:id, /note/new, /flow/:id
     if (path === '/') {
       return { view: 'home' as const, noteId: null, flowId: null };
+    } else if (path === '/trash') {
+      return { view: 'trash' as const, noteId: null, flowId: null };
     } else if (path.startsWith('/note/')) {
       const noteId = path.split('/note/')[1];
       // Handle /note/new as a new note (editor view with null noteId)
@@ -115,17 +120,20 @@ function App() {
       try {
         logger.log('App initialization started');
         
-        // Initialize and apply theme first
+        // Step 1: Initialize and apply theme
+        setLoadingStep('theme');
+        setLoadingSubMessage('Initializing theme');
         const theme = await initializeTheme();
         applyTheme(theme);
         logger.log('Theme initialized:', theme);
         
-        // Check if folder is configured FIRST (before trying to restore handle)
-        // This ensures we don't show onboarding if folder was previously configured
+        // Step 2: Check folder configuration and restore directory handle
+        setLoadingStep('folder-check');
+        setLoadingSubMessage('Checking folder access');
         const folderConfigured = isFolderConfigured();
         logger.log('Folder configured check:', folderConfigured);
         
-        // First, restore directory handle from IndexedDB if configured
+        setLoadingSubMessage('Restoring folder access');
         await initializeDirectoryHandle();
         const handleAvailable = hasDirectoryAccess();
         logger.log('Directory handle initialization completed, handle available:', handleAvailable);
@@ -137,10 +145,21 @@ function App() {
         const hasValidAccess = handleAvailable ? await hasValidDirectoryAccess() : false;
         logger.log('Valid directory access check:', hasValidAccess);
         
-        // Initialize storage (will use file system or localStorage)
-        // Storage will use file system if folder is configured (even if handle needs re-granting)
+        // Step 3: Initialize storage (load from index)
+        setLoadingStep('notes-index');
+        setLoadingSubMessage('Loading notes index');
         await initStorage();
+        
+        // Step 4: Initialize flows
+        setLoadingStep('flows');
+        setLoadingSubMessage('Loading flows');
         await initFlowStorage();
+        
+        // Step 5: Ready
+        setLoadingStep('ready');
+        setLoadingSubMessage('Finalizing');
+        await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for smooth transition
+        
         logger.log('Storage initialization completed');
         
         // Only show onboarding if folder was never configured
@@ -262,6 +281,13 @@ function App() {
     window.history.pushState({}, '', '/notes');
   };
 
+  const navigateToTrash = () => {
+    setCurrentView('trash');
+    setCurrentNoteId(null);
+    setCurrentFlowId(null);
+    window.history.pushState({}, '', '/trash');
+  };
+
   const navigateToFlow = (flowId?: string) => {
     setCurrentFlowId(flowId || null);
     setCurrentView('flow');
@@ -273,13 +299,10 @@ function App() {
     }
   };
 
+
   // Show loading state while initializing
   if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-theme-bg-primary flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <LoadingScreen message={loadingStep} subMessage={loadingSubMessage} />;
   }
 
   // Mobile Warning Overlay - blocks all access on mobile
@@ -388,15 +411,19 @@ function App() {
           {/* Main Content - adjust padding if banner is visible */}
           <div className={needsPermissionRestore ? 'pt-16' : ''}>
             {currentView === 'home' ? (
-              <HomePage onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToFlow={navigateToFlow} onNavigateToNotes={navigateToNotes} />
+              <HomePage onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToFlow={navigateToFlow} onNavigateToNotes={navigateToNotes} onNavigateToTrash={navigateToTrash} />
             ) : currentView === 'editor' ? (
               <EditorPage noteId={currentNoteId} onNavigateToHome={navigateToHome} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} onNavigateToEditor={navigateToEditor} />
             ) : currentView === 'flows' ? (
               <FlowsPage onNavigateToFlow={navigateToFlow} onNavigateToHome={navigateToHome} onNavigateToNotes={navigateToNotes} />
             ) : currentView === 'notes' ? (
               <NotesPage onNavigateToEditor={navigateToEditor} onNavigateToHome={navigateToHome} onNavigateToFlows={navigateToFlows} />
+            ) : currentView === 'trash' ? (
+              <TrashPage onNavigateToHome={navigateToHome} onNavigateToNotes={navigateToNotes} onNavigateToFlows={navigateToFlows} />
             ) : currentView === 'flow' ? (
-              <FlowPage flowId={currentFlowId} onNavigateToHome={navigateToHome} onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} />
+              <Suspense fallback={<LoadingScreen message="flows" subMessage="Loading flow..." />}>
+                <FlowPage flowId={currentFlowId} onNavigateToHome={navigateToHome} onNavigateToEditor={navigateToEditor} onNavigateToFlows={navigateToFlows} onNavigateToNotes={navigateToNotes} />
+              </Suspense>
             ) : (
               <NotFoundPage onNavigateToHome={navigateToHome} />
             )}

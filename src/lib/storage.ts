@@ -1,8 +1,11 @@
 import { 
-  readNotesFromFile, 
-  writeNotesToFile, 
-  readFoldersFromFile, 
-  writeFoldersToFile,
+  readAllNotesFromDirectory,
+  readNoteFromFile,
+  writeNoteToFile,
+  deleteNoteFile,
+  readNotesIndex,
+  validateNotesIndex,
+  rebuildNotesIndex,
   isFolderConfigured,
   hasDirectoryAccess 
 } from './fileSystemStorage';
@@ -20,9 +23,9 @@ export interface Note {
 
 // In-memory cache
 let notesCache: Note[] | null = null;
-let foldersCache: string[] | null = null;
 let isInitialized = false;
 let initializationPromise: Promise<void> | null = null;
+let indexValidated = false; // Track if index has been validated on this load
 
 // Fallback to localStorage if file system is not configured
 const STORAGE_KEY = 'pinn.notes';
@@ -55,10 +58,9 @@ async function initialize(): Promise<void> {
       }
       
       if (folderConfigured && hasAccess) {
-        // Load from file system
-        logger.log('Loading notes and folders from file system...');
-        const loadedNotes = await readNotesFromFile();
-        const loadedFolders = await readFoldersFromFile();
+        // Load from index first (fast path - metadata only)
+        logger.log('Loading notes from index (fast path)...');
+        const loadedNotes = await readAllNotesFromDirectory(false); // false = don't load content
         
         // Only update cache if we got valid data (array, even if empty)
         // Don't overwrite with null or undefined
@@ -69,14 +71,23 @@ async function initialize(): Promise<void> {
           notesCache = notesCache || [];
         }
         
-        if (Array.isArray(loadedFolders)) {
-          foldersCache = loadedFolders;
-        } else {
-          logger.warn('Invalid folders data loaded, keeping existing cache or empty array');
-          foldersCache = foldersCache || [];
+        // Validate index once on app load
+        if (!indexValidated) {
+          logger.log('Validating notes index against file system...');
+          const isValid = await validateNotesIndex();
+          if (!isValid) {
+            logger.warn('Index validation failed, rebuilding...');
+            await rebuildNotesIndex();
+            // Reload from rebuilt index
+            const reloadedNotes = await readAllNotesFromDirectory(false);
+            if (Array.isArray(reloadedNotes)) {
+              notesCache = reloadedNotes;
+            }
+          }
+          indexValidated = true;
         }
         
-        logger.log(`Initialized storage: ${notesCache.length} notes, ${foldersCache.length} folders`);
+        logger.log(`Initialized storage: ${notesCache.length} notes (from index)`);
       } else {
         logger.log('Using localStorage fallback (folder configured:', folderConfigured, ', has access:', hasAccess, ')');
         // Fallback to localStorage
@@ -92,23 +103,11 @@ async function initialize(): Promise<void> {
           notesCache = [];
         }
 
-        try {
-          const raw = localStorage.getItem(FOLDERS_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            foldersCache = Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean) : [];
-          } else {
-            foldersCache = [];
-          }
-        } catch {
-          foldersCache = [];
-        }
-        logger.log(`Initialized storage from localStorage: ${notesCache.length} notes, ${foldersCache.length} folders`);
+        logger.log(`Initialized storage from localStorage: ${notesCache.length} notes`);
       }
     } catch (error) {
       logger.error('Error initializing storage:', error);
       notesCache = [];
-      foldersCache = [];
     }
     isInitialized = true;
   })();
@@ -118,6 +117,7 @@ async function initialize(): Promise<void> {
 
 /**
  * Write notes to storage (file system or localStorage) - internal async version
+ * Writes individual files for each note
  */
 async function writeAllAsync(notes: Note[]): Promise<void> {
   notesCache = notes;
@@ -132,9 +132,17 @@ async function writeAllAsync(notes: Note[]): Promise<void> {
       // If folder is configured, we MUST use file system
       // If handle isn't available, this is an error condition
       if (hasAccess) {
-        logger.log('Writing notes to file system...');
-        await writeNotesToFile(notes);
-        logger.log('Successfully wrote notes to file system');
+        logger.log('Writing notes to file system (individual files)...');
+        // Write each note as an individual file
+        for (const note of notes) {
+          try {
+            await writeNoteToFile(note);
+          } catch (error) {
+            logger.error(`Error writing note ${note.id}:`, error);
+            // Continue with other notes
+          }
+        }
+        logger.log('Successfully wrote all notes to file system');
       } else {
         // Folder is configured but handle isn't available - this shouldn't happen
         // Try to restore the handle
@@ -144,7 +152,13 @@ async function writeAllAsync(notes: Note[]): Promise<void> {
         
         if (hasDirectoryAccess()) {
           logger.log('Handle restored, writing to file system...');
-          await writeNotesToFile(notes);
+          for (const note of notes) {
+            try {
+              await writeNoteToFile(note);
+            } catch (error) {
+              logger.error(`Error writing note ${note.id}:`, error);
+            }
+          }
           logger.log('Successfully wrote notes to file system after handle restoration');
         } else {
           logger.error('ERROR: Folder is configured but cannot access directory handle! Data not persisted.');
@@ -191,61 +205,20 @@ function readAll(): Note[] {
 }
 
 /**
- * Write folders to storage
- */
-async function writeFolders(folders: string[]): Promise<void> {
-  const unique = Array.from(new Set(folders.map((f) => (f || '').trim()).filter(Boolean)));
-  foldersCache = unique;
-  
-  try {
-    const folderConfigured = isFolderConfigured();
-    const hasAccess = hasDirectoryAccess();
-    
-    if (folderConfigured) {
-      if (hasAccess) {
-        await writeFoldersToFile(unique);
-      } else {
-        // Try to restore handle
-        const { initializeDirectoryHandle } = await import('./fileSystemStorage');
-        await initializeDirectoryHandle();
-        
-        if (hasDirectoryAccess()) {
-          await writeFoldersToFile(unique);
-        } else {
-          logger.error('ERROR: Cannot write folders - folder configured but handle unavailable!');
-          localStorage.setItem(FOLDERS_KEY, JSON.stringify(unique));
-        }
-      }
-    } else {
-      localStorage.setItem(FOLDERS_KEY, JSON.stringify(unique));
-    }
-  } catch (error) {
-    logger.error('Error writing folders:', error);
-    try {
-      localStorage.setItem(FOLDERS_KEY, JSON.stringify(unique));
-    } catch (localError) {
-      logger.error('Failed to write folders to localStorage backup:', localError);
-    }
-  }
-}
-
-/**
- * Read folders from cache
+ * Read folders from the file system structure
+ * Folders are now determined by the actual directory structure
  */
 function readFolders(): string[] {
-  if (!isInitialized) {
-    try {
-      const raw = localStorage.getItem(FOLDERS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean) : [];
-      }
-    } catch {
-      // ignore
+  // Folders are now determined by the file system structure
+  // We get them from the notes index
+  const folders = new Set<string>();
+  const notes = readAll();
+  for (const note of notes) {
+    if (note.folder && note.folder.trim()) {
+      folders.add(note.folder.trim());
     }
-    return [];
   }
-  return foldersCache || [];
+  return Array.from(folders).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -261,6 +234,7 @@ export async function initStorage(): Promise<void> {
 export async function refreshStorage(): Promise<void> {
   isInitialized = false;
   initializationPromise = null;
+  indexValidated = false; // Reset validation flag
   await initialize();
 }
 
@@ -269,7 +243,56 @@ export function getNotes(): Note[] {
 }
 
 export function getNoteById(id: string): Note | null {
-  return readAll().find((n) => n.id === id) || null;
+  const note = readAll().find((n) => n.id === id);
+  if (!note) {
+    return null;
+  }
+  
+  // If note has no content (loaded from index), we need to load it
+  // This is lazy loading - content is only loaded when needed
+  if (!note.content && isFolderConfigured() && hasDirectoryAccess()) {
+    // Load content asynchronously (non-blocking)
+    readNoteFromFile(id).then((fullNote) => {
+      if (fullNote && notesCache) {
+        const index = notesCache.findIndex((n) => n.id === id);
+        if (index >= 0) {
+          notesCache[index] = fullNote;
+        }
+      }
+    }).catch((error) => {
+      logger.error(`Error lazy loading note ${id}:`, error);
+    });
+    
+    // Return note with empty content for now
+    return note;
+  }
+  
+  return note;
+}
+
+/**
+ * Get note with content (forces content load if needed)
+ */
+export async function getNoteByIdWithContent(id: string): Promise<Note | null> {
+  const note = readAll().find((n) => n.id === id);
+  if (!note) {
+    return null;
+  }
+  
+  // If note has no content, load it
+  if (!note.content && isFolderConfigured() && hasDirectoryAccess()) {
+    const fullNote = await readNoteFromFile(id);
+    if (fullNote && notesCache) {
+      const index = notesCache.findIndex((n) => n.id === id);
+      if (index >= 0) {
+        notesCache[index] = fullNote;
+        return fullNote;
+      }
+    }
+    return fullNote;
+  }
+  
+  return note;
 }
 
 // Sync wrapper for saveNote (non-blocking)
@@ -282,7 +305,14 @@ export function saveNote(note: Note): Note {
   } else {
     all.unshift(next);
   }
-  writeAll(all); // Non-blocking async write
+  notesCache = all;
+  // Write individual file
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    writeNoteToFile(next).catch(logger.error);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
   return next;
 }
 
@@ -296,7 +326,15 @@ export async function saveNoteAsync(note: Note): Promise<Note> {
   } else {
     all.unshift(next);
   }
-  await writeAllAsync(all);
+  notesCache = all;
+  
+  // Write individual file
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    await writeNoteToFile(next);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
   return next;
 }
 
@@ -317,8 +355,18 @@ export function createNote(title: string, content: string): Note {
 }
 
 export function deleteNote(id: string): void {
+  const note = getNoteById(id);
   const all = readAll().filter((n) => n.id !== id);
-  writeAll(all); // Non-blocking async write
+  notesCache = all;
+  
+  // Move to trash instead of deleting
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    const { moveNoteToTrash } = require('./trashStorage');
+    moveNoteToTrash(id, note?.folder).catch(logger.error);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
 }
 
 export function setNoteFolder(id: string, folder: string | undefined): Note | null {
@@ -328,35 +376,28 @@ export function setNoteFolder(id: string, folder: string | undefined): Note | nu
   const normalized = (folder || '').trim();
   const next: Note = { ...all[index], folder: normalized || undefined, updated_at: new Date().toISOString() };
   all[index] = next;
-  writeAll(all); // Non-blocking async write
-  if (normalized) {
-    const list = readFolders();
-    if (!list.includes(normalized)) {
-      list.push(normalized);
-      writeFolders(list).catch(logger.error); // Non-blocking async write
-    }
+  notesCache = all;
+  
+  // Write individual file (will move it to the correct folder)
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    writeNoteToFile(next).catch(logger.error);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   }
   return next;
 }
 
 export function getAllFolders(): string[] {
-  const fromNotes = new Set<string>();
-  for (const n of readAll()) {
-    if (n.folder && n.folder.trim()) fromNotes.add(n.folder.trim());
-  }
-  const fromList = new Set<string>(readFolders());
-  const union = new Set<string>([...fromNotes, ...fromList]);
-  return Array.from(union).sort((a, b) => a.localeCompare(b));
+  // Folders are now determined by the file system structure
+  return readFolders();
 }
 
 export function addFolder(name: string): void {
-  const normalized = (name || '').trim();
-  if (!normalized) return;
-  const list = readFolders();
-  if (!list.includes(normalized)) {
-    list.push(normalized);
-    writeFolders(list).catch(logger.error); // Non-blocking async write
-  }
+  // Folders are now created automatically when notes are added to them
+  // This function is kept for API compatibility but doesn't need to do anything
+  // The folder will be created when a note is assigned to it
+  logger.log(`addFolder called for: ${name} (folders are now managed by file system structure)`);
 }
 
 export function renameFolder(oldName: string, newName: string): { updatedCount: number } {
@@ -365,18 +406,37 @@ export function renameFolder(oldName: string, newName: string): { updatedCount: 
   if (!source || !target || source === target) return { updatedCount: 0 };
   const all = readAll();
   let updated = 0;
-  const next = all.map((n) => {
-    if ((n.folder || '').trim() === source) {
+  const notesToUpdate: Note[] = [];
+  
+  for (const note of all) {
+    if ((note.folder || '').trim() === source) {
       updated += 1;
-      return { ...n, folder: target, updated_at: new Date().toISOString() };
+      const updatedNote: Note = { ...note, folder: target, updated_at: new Date().toISOString() };
+      notesToUpdate.push(updatedNote);
     }
-    return n;
-  });
-  writeAll(next); // Non-blocking async write
-  // update folder list
-  const list = readFolders().filter((f) => f !== source);
-  list.push(target);
-  writeFolders(list).catch(logger.error); // Non-blocking async write
+  }
+  
+  // Update each note file individually
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    for (const note of notesToUpdate) {
+      const index = all.findIndex((n) => n.id === note.id);
+      if (index >= 0) {
+        all[index] = note;
+      }
+      writeNoteToFile(note).catch(logger.error);
+    }
+  } else {
+    // Fallback to localStorage
+    for (const note of notesToUpdate) {
+      const index = all.findIndex((n) => n.id === note.id);
+      if (index >= 0) {
+        all[index] = note;
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
+  
+  notesCache = all;
   return { updatedCount: updated };
 }
 
@@ -389,28 +449,47 @@ export function deleteFolder(
   const all = readAll();
   let affected = 0;
   let next: Note[];
+  
   if (mode === 'delete-notes') {
+    const notesInFolder = all.filter((n) => (n.folder || '').trim() === target);
+    affected = notesInFolder.length;
+    
+    // Move folder and notes to trash
+    if (isFolderConfigured() && hasDirectoryAccess()) {
+      const { moveFolderToTrash } = require('./trashStorage');
+      moveFolderToTrash(target, notesInFolder).catch(logger.error);
+    }
+    
     next = all.filter((n) => {
       const isInFolder = (n.folder || '').trim() === target;
-      if (isInFolder) affected += 1;
       return !isInFolder;
     });
   } else {
     next = all.map((n) => {
       if ((n.folder || '').trim() === target) {
         affected += 1;
-        return { ...n, folder: undefined, updated_at: new Date().toISOString() };
+        const updatedNote = { ...n, folder: undefined, updated_at: new Date().toISOString() };
+        // Update the note file (will move to unfiled)
+        if (isFolderConfigured() && hasDirectoryAccess()) {
+          writeNoteToFile(updatedNote).catch(logger.error);
+        }
+        return updatedNote;
       }
       return n;
     });
   }
-  writeAll(next); // Non-blocking async write
-  // remove folder from list
-  writeFolders(readFolders().filter((f) => f !== target)).catch(logger.error); // Non-blocking async write
+  
+  notesCache = next;
+  
+  // Update localStorage if not using file system
+  if (!isFolderConfigured() || !hasDirectoryAccess()) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  }
+  
   return { affectedCount: affected };
 }
 
-// Synchronous wrapper for backward compatibility (non-blocking write)
+// Synchronous wrapper (non-blocking write)
 export function writeAll(notes: Note[]): void {
   notesCache = notes;
   writeAllAsync(notes).catch(logger.error);

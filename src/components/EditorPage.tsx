@@ -26,7 +26,7 @@ import {
   Sparkles,
   FileText,
 } from 'lucide-react';
-import { getNoteById, saveNote, createNote, deleteNote, getNotes, writeAll, getAllFolders, setNoteFolder } from '../lib/storage';
+import { getNoteById, getNoteByIdWithContent, saveNote, createNote, deleteNote, getNotes, writeAll, getAllFolders, setNoteFolder } from '../lib/storage';
 import { getFlows, createFlow, addNoteToFlow, Flow, getFlowsContainingNote } from '../lib/flowStorage';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
@@ -151,9 +151,9 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     }
   };
 
-  const loadNote = (id: string) => {
+  const loadNote = async (id: string) => {
     try {
-      const data = getNoteById(id);
+      const data = await getNoteByIdWithContent(id);
       if (data) {
         setTitle(data.title);
         setContent(data.content);
@@ -279,10 +279,11 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     // Save title changes in both edit and preview modes
     // Content changes only happen in edit mode (preview is read-only)
     setSaving(true);
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       try {
         if (currentNoteId) {
-          const existingNote = getNoteById(currentNoteId);
+          // Get note with content to ensure we have created_at
+          const existingNote = await getNoteByIdWithContent(currentNoteId);
           // In preview mode, content is read-only so use existing content
           // In edit mode, use current content state
           const contentToSave = isEditMode ? content : (existingNote?.content || content);
@@ -421,9 +422,9 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     };
   }, [editorMode, content]);
 
-  const handleExportNote = () => {
+  const handleExportNote = async () => {
     if (!currentNoteId) return;
-    const note = getNoteById(currentNoteId);
+    const note = await getNoteByIdWithContent(currentNoteId);
     if (!note) return;
     exportNoteAsJSON(note);
     setMenuOpen(false);
@@ -477,9 +478,9 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     }
   };
 
-  const handleExportNoteMarkdown = () => {
+  const handleExportNoteMarkdown = async () => {
     if (!currentNoteId) return;
-    const note = getNoteById(currentNoteId);
+    const note = await getNoteByIdWithContent(currentNoteId);
     if (!note) return;
     exportNoteAsMarkdown(note);
     setMenuOpen(false);
@@ -487,7 +488,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
 
   const handleExportNotePDF = async () => {
     if (!currentNoteId) return;
-    const note = getNoteById(currentNoteId);
+    const note = await getNoteByIdWithContent(currentNoteId);
     if (!note) return;
 
     setMenuOpen(false);

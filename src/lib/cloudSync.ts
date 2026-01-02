@@ -107,13 +107,11 @@ export async function clearCloudConfig(): Promise<void> {
  * @param selectedFlowIds Optional array of flow IDs to include. If not provided, all flows are included.
  */
 async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: string[]): Promise<{ name: string; content: string }[]> {
-  const files = ['notes.json', 'folders.json', 'flows.json', 'flowCategories.json', 'theme.json', 'cloudConfig.json'];
   const dataFiles: { name: string; content: string }[] = [];
 
   if (!isFolderConfigured() || !hasDirectoryAccess()) {
-    // Read from localStorage
+    // Read from localStorage (fallback)
     const notesData = localStorage.getItem('pinn.notes');
-    const foldersData = localStorage.getItem('pinn.folders');
     const flowsData = localStorage.getItem('pinn.flows');
     const categoriesData = localStorage.getItem('pinn.flowCategories');
     const themeData = localStorage.getItem('pinn.theme');
@@ -126,7 +124,6 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
         try {
           const notes = JSON.parse(notesData);
           if (Array.isArray(notes)) {
-            // If array is provided (even if empty), filter to only selected notes
             const filteredNotes = notes.filter((note: any) => selectedNoteIds.includes(note.id));
             notesContent = JSON.stringify(filteredNotes);
           }
@@ -136,8 +133,6 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
       }
       dataFiles.push({ name: 'notes.json', content: notesContent });
     }
-
-    if (foldersData) dataFiles.push({ name: 'folders.json', content: foldersData });
     
     // Filter flows if selection is provided
     if (flowsData) {
@@ -146,7 +141,6 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
         try {
           const flows = JSON.parse(flowsData);
           if (Array.isArray(flows)) {
-            // If array is provided (even if empty), filter to only selected flows
             const filteredFlows = flows.filter((flow: any) => selectedFlowIds.includes(flow.id));
             flowsContent = JSON.stringify(filteredFlows);
           }
@@ -164,46 +158,49 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
     return dataFiles;
   }
 
+  // Use new file structure
   const dirHandle = getDirectoryHandle();
   if (!dirHandle) return dataFiles;
 
-  for (const fileName of files) {
+  try {
+    // Read notes from new structure
+    const { readAllNotesFromDirectory } = await import('./fileSystemStorage');
+    const allNotes = await readAllNotesFromDirectory();
+    
+    let notesToSync = allNotes;
+    if (selectedNoteIds !== undefined) {
+      notesToSync = allNotes.filter((note: any) => selectedNoteIds.includes(note.id));
+    }
+    
+    dataFiles.push({ name: 'notes.json', content: JSON.stringify(notesToSync) });
+  } catch (error) {
+    logger.warn('Error reading notes for cloud sync:', error);
+  }
+
+  try {
+    // Read flows from new structure
+    const { readAllFlowsFromDirectory } = await import('./fileSystemStorage');
+    const allFlows = await readAllFlowsFromDirectory();
+    
+    let flowsToSync = allFlows;
+    if (selectedFlowIds !== undefined) {
+      flowsToSync = allFlows.filter((flow: any) => selectedFlowIds.includes(flow.id));
+    }
+    
+    dataFiles.push({ name: 'flows.json', content: JSON.stringify(flowsToSync) });
+  } catch (error) {
+    logger.warn('Error reading flows for cloud sync:', error);
+  }
+
+  // Read other files (categories, theme, cloudConfig)
+  const otherFiles = ['flowCategories.json', 'theme.json', 'cloudConfig.json'];
+  for (const fileName of otherFiles) {
     try {
       const fileHandle = await dirHandle.getFileHandle(fileName, { create: false });
       const file = await fileHandle.getFile();
       const text = await file.text();
       if (text.trim()) {
-        let content = text;
-        
-        // Filter notes if selection is provided
-        if (fileName === 'notes.json' && selectedNoteIds !== undefined) {
-          try {
-            const notes = JSON.parse(text);
-            if (Array.isArray(notes)) {
-              // If array is provided (even if empty), filter to only selected notes
-              const filteredNotes = notes.filter((note: any) => selectedNoteIds.includes(note.id));
-              content = JSON.stringify(filteredNotes);
-            }
-          } catch (e) {
-            logger.warn('Error filtering notes:', e);
-          }
-        }
-        
-        // Filter flows if selection is provided
-        if (fileName === 'flows.json' && selectedFlowIds !== undefined) {
-          try {
-            const flows = JSON.parse(text);
-            if (Array.isArray(flows)) {
-              // If array is provided (even if empty), filter to only selected flows
-              const filteredFlows = flows.filter((flow: any) => selectedFlowIds.includes(flow.id));
-              content = JSON.stringify(filteredFlows);
-            }
-          } catch (e) {
-            logger.warn('Error filtering flows:', e);
-          }
-        }
-        
-        dataFiles.push({ name: fileName, content });
+        dataFiles.push({ name: fileName, content: text });
       }
     } catch (error: any) {
       if (error.name !== 'NotFoundError') {
@@ -916,8 +913,6 @@ export async function saveDownloadedData(data: { [key: string]: string }): Promi
     for (const [fileName, content] of Object.entries(data)) {
       if (fileName === 'notes.json') {
         localStorage.setItem('pinn.notes', content);
-      } else if (fileName === 'folders.json') {
-        localStorage.setItem('pinn.folders', content);
       } else if (fileName === 'flows.json') {
         localStorage.setItem('pinn.flows', content);
       } else if (fileName === 'flowCategories.json') {
@@ -936,15 +931,57 @@ export async function saveDownloadedData(data: { [key: string]: string }): Promi
     throw new Error('No directory access');
   }
 
-  for (const [fileName, content] of Object.entries(data)) {
+  // Handle notes.json - save to new structure
+  if (data['notes.json']) {
     try {
-      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      await writable.close();
+      const notes = JSON.parse(data['notes.json']);
+      if (Array.isArray(notes)) {
+        const { writeNoteToFile } = await import('./fileSystemStorage');
+        for (const note of notes) {
+          try {
+            await writeNoteToFile(note);
+          } catch (error) {
+            logger.error(`Error saving note ${note.id}:`, error);
+          }
+        }
+      }
     } catch (error) {
-      logger.error(`Error saving ${fileName}:`, error);
-      throw error;
+      logger.error('Error parsing notes.json:', error);
+    }
+  }
+
+  // Handle flows.json - save to new structure
+  if (data['flows.json']) {
+    try {
+      const flows = JSON.parse(data['flows.json']);
+      if (Array.isArray(flows)) {
+        const { writeFlowToFile } = await import('./fileSystemStorage');
+        for (const flow of flows) {
+          try {
+            await writeFlowToFile(flow);
+          } catch (error) {
+            logger.error(`Error saving flow ${flow.id}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error parsing flows.json:', error);
+    }
+  }
+
+  // Handle other files (categories, theme, cloudConfig)
+  const otherFiles = ['flowCategories.json', 'theme.json', 'cloudConfig.json'];
+  for (const fileName of otherFiles) {
+    if (data[fileName]) {
+      try {
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(data[fileName]);
+        await writable.close();
+      } catch (error) {
+        logger.error(`Error saving ${fileName}:`, error);
+        throw error;
+      }
     }
   }
 }

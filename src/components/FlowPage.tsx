@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { FileText, X, Search, Trash2, Tag, Palette, Edit2, Clock, PlusCircle, Calendar, ChevronLeft, Check, HelpCircle, GitBranch, AlertCircle, CheckCircle2, Book } from 'lucide-react';
 import { getFlowById, saveFlow, createFlow as createFlowStorage, Flow, FlowNode, FlowEdge, removeNodeFromFlow, setFlowCategory } from '../lib/flowStorage';
-import { getNotes, getNoteById, saveNote, createNote, Note } from '../lib/storage';
+import { getNotes, getNoteById, getNoteByIdWithContent, saveNote, createNote, Note } from '../lib/storage';
 import MarkdownPreview from './MarkdownPreview';
 
 interface FlowPageProps {
@@ -147,6 +147,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
   const [editingNoteTitle, setEditingNoteTitle] = useState(false);
   const [noteTitleValue, setNoteTitleValue] = useState('');
   const noteTitleInputRef = useRef<HTMLInputElement>(null);
+  const [selectedNoteWithContent, setSelectedNoteWithContent] = useState<Note | null>(null);
   const isEditingRef = useRef(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const edgeOptionsRef = useRef<HTMLDivElement>(null);
@@ -769,6 +770,20 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
 
   const selectedNote = selectedNode ? getNoteById(selectedNode.data.noteId) : null;
 
+  // Load note content when selectedNode changes
+  useEffect(() => {
+    if (selectedNode) {
+      getNoteByIdWithContent(selectedNode.data.noteId).then((note) => {
+        setSelectedNoteWithContent(note);
+      }).catch((error) => {
+        logger.error('Error loading note content:', error);
+        setSelectedNoteWithContent(null);
+      });
+    } else {
+      setSelectedNoteWithContent(null);
+    }
+  }, [selectedNode]);
+
   // Sync note title value when selected note changes (but not while editing)
   useEffect(() => {
     if (selectedNote && !editingNoteTitle) {
@@ -791,21 +806,21 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
   }, [editingNoteTitle]);
 
   const handleSaveNoteTitle = () => {
-    if (!selectedNote || !selectedNode || !flow) return;
+    if (!selectedNoteWithContent || !selectedNode || !flow) return;
     if (!isEditingRef.current) return; // Don't save if we're not actually editing
     
     const trimmedTitle = noteTitleValue.trim();
     if (!trimmedTitle) {
-      setNoteTitleValue(selectedNote.title);
+      setNoteTitleValue(selectedNoteWithContent.title);
       setEditingNoteTitle(false);
       isEditingRef.current = false;
       return;
     }
-
-    if (trimmedTitle !== selectedNote.title) {
+    
+    if (trimmedTitle !== selectedNoteWithContent.title) {
       // Save to note
       saveNote({
-        ...selectedNote,
+        ...selectedNoteWithContent,
         title: trimmedTitle,
       });
 
@@ -1647,7 +1662,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                             handleSaveNoteTitle();
                           } else if (e.key === 'Escape') {
                             e.preventDefault();
-                            setNoteTitleValue(selectedNote.title);
+                            setNoteTitleValue(selectedNoteWithContent?.title || selectedNote?.title || '');
                             setEditingNoteTitle(false);
                           }
                         }}
@@ -1665,7 +1680,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                         }}
                         title="Click to edit title"
                       >
-                        {selectedNote.title}
+                        {selectedNoteWithContent?.title || selectedNote?.title || ''}
                       </h2>
                     )}
                   </div>
@@ -1673,7 +1688,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {new Date(selectedNote.updated_at).toLocaleDateString('en-GB', {
+                        {new Date(selectedNoteWithContent?.updated_at || selectedNote?.updated_at || new Date().toISOString()).toLocaleDateString('en-GB', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
@@ -1701,7 +1716,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => onNavigateToEditor(selectedNote.id)}
+                    onClick={() => onNavigateToEditor(selectedNoteWithContent?.id || selectedNote?.id || '')}
                     className="px-4 py-2.5 bg-theme-accent hover:bg-[#4F46E5] text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-lg hover:shadow-xl"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -1721,7 +1736,7 @@ export default function FlowPage({ flowId, onNavigateToHome: _onNavigateToHome, 
               </div>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-6 bg-theme-bg-primary">
-              <MarkdownPreview content={selectedNote.content || ''} />
+              <MarkdownPreview content={selectedNoteWithContent?.content || ''} />
             </div>
           </div>
         </div>

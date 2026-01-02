@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Folder, Info, AlertCircle, CheckCircle2, ShieldCheck, HardDrive, Book, ArrowRight } from 'lucide-react';
-import { requestDirectoryAccess, setDirectoryHandle, isFileSystemSupported, migrateFromLocalStorage } from '../lib/fileSystemStorage';
+import { Folder, Info, AlertCircle, ShieldCheck, HardDrive, Book, ArrowRight } from 'lucide-react';
+import { requestDirectoryAccess, setDirectoryHandle, isFileSystemSupported } from '../lib/fileSystemStorage';
 import { logger } from '../utils/logger';
 
 interface OnboardingDialogProps {
@@ -10,8 +10,6 @@ interface OnboardingDialogProps {
 export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [migrationComplete, setMigrationComplete] = useState(false);
 
   const handleSelectFolder = async () => {
     if (!isFileSystemSupported()) {
@@ -34,34 +32,10 @@ export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) 
       // Set the directory handle (async now)
       await setDirectoryHandle(handle, handle.name);
 
-      // Check if there's data in localStorage to migrate
-      const hasNotes = localStorage.getItem('pinn.notes');
-      const hasFlows = localStorage.getItem('pinn.flows');
-      
-      if (hasNotes || hasFlows) {
-        setIsMigrating(true);
-        try {
-          const result = await migrateFromLocalStorage();
-          setMigrationComplete(true);
-          
-          // Clear localStorage after successful migration
-          if (result.notesMigrated > 0 || result.flowsMigrated > 0) {
-            localStorage.removeItem('pinn.notes');
-            localStorage.removeItem('pinn.flows');
-            localStorage.removeItem('pinn.folders');
-          }
-        } catch (migrationError: any) {
-          logger.error('Migration error:', migrationError);
-          setError(`Migration failed: ${migrationError.message}. Your data is still in browser storage.`);
-          setIsMigrating(false);
-          return;
-        }
-      }
-
       // Wait a moment to show success message
       setTimeout(() => {
         onComplete();
-      }, migrationComplete ? 1500 : 500);
+      }, 500);
     } catch (err: any) {
       logger.error('Error selecting folder:', err);
       setError(err.message || 'Failed to select folder. Please try again.');
@@ -163,19 +137,6 @@ export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) 
             </div>
           )}
 
-          {isMigrating && (
-            <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400 flex-shrink-0 mt-0.5"></div>
-              <p className="text-sm text-blue-400">Migrating your existing data from browser storage to the selected folder…</p>
-            </div>
-          )}
-
-          {migrationComplete && (
-            <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-4 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-emerald-400">Successfully migrated your data. You're all set!</p>
-            </div>
-          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-theme-border">
             <div className="text-xs text-gray-500">
@@ -184,18 +145,13 @@ export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) 
             <div className="flex items-center gap-3">
               <button
                 onClick={handleSelectFolder}
-                disabled={isSelecting || isMigrating}
+                disabled={isSelecting}
                 className="px-5 py-2.5 text-sm font-medium bg-theme-accent hover:bg-theme-accent-hover text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-theme-accent shadow-lg hover:shadow-xl flex items-center gap-2"
               >
                 {isSelecting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <span>Selecting…</span>
-                  </>
-                ) : isMigrating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Migrating…</span>
                   </>
                 ) : (
                   <>

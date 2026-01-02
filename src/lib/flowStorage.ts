@@ -1,6 +1,8 @@
 import { 
-  readFlowsFromFile, 
-  writeFlowsToFile,
+  readAllFlowsFromDirectory,
+  readFlowFromFile,
+  writeFlowToFile,
+  deleteFlowFile,
   readCategoriesFromFile,
   writeCategoriesToFile,
   isFolderConfigured,
@@ -95,9 +97,9 @@ async function initialize(): Promise<void> {
       }
       
       if (folderConfigured && hasAccess) {
-        // Load from file system
-        logger.log('Loading flows and categories from file system...');
-        const loadedFlows = await readFlowsFromFile();
+        // Load from file system using new structure
+        logger.log('Loading flows and categories from file system (new structure)...');
+        const loadedFlows = await readAllFlowsFromDirectory();
         const loadedCategories = await readCategoriesFromFile();
         
         // Only update cache if we got valid data (array, even if empty)
@@ -158,6 +160,7 @@ async function initialize(): Promise<void> {
 
 /**
  * Write flows to storage (file system or localStorage) - internal async version
+ * Writes individual files for each flow
  */
 async function writeAllAsync(flows: Flow[]): Promise<void> {
   flowsCache = flows;
@@ -171,9 +174,17 @@ async function writeAllAsync(flows: Flow[]): Promise<void> {
     if (folderConfigured) {
       // If folder is configured, we MUST use file system
       if (hasAccess) {
-        logger.log('Writing flows to file system...');
-        await writeFlowsToFile(flows);
-        logger.log('Successfully wrote flows to file system');
+        logger.log('Writing flows to file system (individual files)...');
+        // Write each flow as an individual file
+        for (const flow of flows) {
+          try {
+            await writeFlowToFile(flow);
+          } catch (error) {
+            logger.error(`Error writing flow ${flow.id}:`, error);
+            // Continue with other flows
+          }
+        }
+        logger.log('Successfully wrote all flows to file system');
       } else {
         // Try to restore the handle
         logger.warn('Folder configured but handle not available. Attempting to restore...');
@@ -182,7 +193,13 @@ async function writeAllAsync(flows: Flow[]): Promise<void> {
         
         if (hasDirectoryAccess()) {
           logger.log('Handle restored, writing to file system...');
-          await writeFlowsToFile(flows);
+          for (const flow of flows) {
+            try {
+              await writeFlowToFile(flow);
+            } catch (error) {
+              logger.error(`Error writing flow ${flow.id}:`, error);
+            }
+          }
           logger.log('Successfully wrote flows to file system after handle restoration');
         } else {
           logger.error('ERROR: Folder is configured but cannot access directory handle! Data not persisted.');
@@ -303,7 +320,7 @@ export async function refreshFlowStorage(): Promise<void> {
   await initialize();
 }
 
-// Synchronous wrapper for backward compatibility (non-blocking write)
+// Synchronous wrapper (non-blocking write)
 export function writeAll(flows: Flow[]): void {
   flowsCache = flows;
   writeAllAsync(flows).catch(logger.error);
@@ -326,7 +343,15 @@ export function saveFlow(flow: Flow): Flow {
   } else {
     all.unshift(next);
   }
-  writeAll(all); // Non-blocking async write
+  flowsCache = all;
+  
+  // Write individual file
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    writeFlowToFile(next).catch(logger.error);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
   return next;
 }
 
@@ -350,7 +375,15 @@ export function createFlow(title: string): Flow {
 
 export function deleteFlow(id: string): void {
   const all = readAll().filter((f) => f.id !== id);
-  writeAll(all); // Non-blocking async write
+  flowsCache = all;
+  
+  // Delete individual file
+  if (isFolderConfigured() && hasDirectoryAccess()) {
+    deleteFlowFile(id).catch(logger.error);
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
 }
 
 export function addNoteToFlow(flowId: string, noteId: string, noteTitle: string, position?: { x: number; y: number }): Flow | null {
@@ -471,9 +504,17 @@ export function deleteCategory(
   let affected = 0;
   let next: Flow[];
   if (mode === 'delete-flows') {
+    const flowsInCategory = all.filter((f) => (f.category || '').trim() === target);
+    affected = flowsInCategory.length;
+    
+    // Move category and flows to trash
+    if (isFolderConfigured() && hasDirectoryAccess()) {
+      const { moveCategoryToTrash } = require('./trashStorage');
+      moveCategoryToTrash(target, flowsInCategory).catch(logger.error);
+    }
+    
     next = all.filter((f) => {
       const isInCategory = (f.category || '').trim() === target;
-      if (isInCategory) affected += 1;
       return !isInCategory;
     });
   } else {

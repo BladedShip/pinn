@@ -5,9 +5,94 @@
     <link rel="icon" type="image/svg+xml" href="/pinn.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pinn.</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height: 100vh; background-color: #2c3440; display: flex; align-items: center; justify-content: center; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;">
+        <div style="text-align: center; display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; align-items: center; justify-content: center;">
+            <div style="width: 48px; height: 48px; border: 4px solid #4a5560; border-top-color: #6366F1; border-radius: 50%; animation: spin 1s linear infinite;" role="status" aria-label="Loading">
+              <span style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;">Loading...</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <p id="loading-message" style="font-size: 18px; font-weight: 500; margin: 0; color: #e5e7eb;">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function() {
+        const messages = [
+          "Committing war crimes",
+          "Breaking Geneva conventions",
+          "Shaving Hitler's beard",
+          "Stealing your data",
+          "Summoning demons",
+          "Bribing the judge",
+          "Faking the moon landing",
+          "Kidnapping the president",
+          "Hacking the mainframe",
+          "Burning evidence",
+          "Erasing fingerprints",
+          "Forging documents",
+          "Escaping prison",
+          "Rigging elections",
+          "Cloning dinosaurs",
+          "Time traveling illegally",
+          "Selling state secrets",
+          "Starting a cult",
+          "Bribing aliens",
+          "Inventing crimes",
+          "Frame by frame",
+          "Pixel by pixel",
+          "Byte by byte",
+          "Loading your sins",
+          "Counting your mistakes",
+          "Judging silently",
+          "Preparing judgment",
+          "Assembling the jury",
+          "Sharpening pitchforks",
+          "Polishing guillotines"
+        ];
+        
+        const messageElement = document.getElementById('loading-message');
+        let lastIndex = -1;
+        
+        function updateMessage() {
+          if (messageElement) {
+            let randomIndex;
+            // Ensure we don't show the same message twice in a row
+            do {
+              randomIndex = Math.floor(Math.random() * messages.length);
+            } while (randomIndex === lastIndex && messages.length > 1);
+            
+            lastIndex = randomIndex;
+            messageElement.textContent = messages[randomIndex];
+          }
+        }
+        
+        // Update every 800ms for quick rotation
+        setInterval(updateMessage, 800);
+        updateMessage(); // Show first message immediately
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

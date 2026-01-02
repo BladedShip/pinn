@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { Search, Plus, Menu as MenuIcon, FileText, Download, Upload, Trash2, GitBranch, Bookmark, Book, Sparkles, Settings, Network } from 'lucide-react';
 import { getNotes as loadFromStorage, Note, writeAll } from '../lib/storage';
 import { getFlows, Flow } from '../lib/flowStorage';
@@ -17,9 +17,10 @@ interface HomePageProps {
   onNavigateToFlows: () => void;
   onNavigateToFlow: (flowId: string) => void;
   onNavigateToNotes: () => void;
+  onNavigateToTrash: () => void;
 }
 
-export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavigateToFlow, onNavigateToNotes }: HomePageProps) {
+export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavigateToFlow, onNavigateToNotes, onNavigateToTrash }: HomePageProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -293,6 +294,13 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
             <GitBranch className="w-5 h-5" />
             <span>Flow</span>
           </button>
+          <button
+            onClick={onNavigateToTrash}
+            className="flex items-center gap-2 px-4 py-2 text-theme-text-primary hover:text-white transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+            <span>Trash</span>
+          </button>
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -550,7 +558,16 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
       />
 
       {showGraphView && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50"><LoadingSpinner size="lg" /></div>}>
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-theme-surface border border-theme-border rounded-lg p-8 max-w-md w-full mx-4 shadow-lg">
+              <div className="flex flex-col items-center space-y-4">
+                <LoadingSpinner size="lg" />
+                <p className="text-theme-text-primary">Loading graph view...</p>
+              </div>
+            </div>
+          </div>
+        }>
           <GraphViewDialog
             isOpen={showGraphView}
             onClose={() => setShowGraphView(false)}
