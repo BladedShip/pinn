@@ -14,24 +14,28 @@ body {
   min-height: 100vh;
 }
 
-/* Remove all default focus outlines and rings */
-*:focus,
-*:focus-visible,
-*:active,
-button:focus,
-button:focus-visible,
-button:active {
+/* Remove focus outlines for mouse users only */
+*:focus:not(:focus-visible) {
   outline: none !important;
-  outline-width: 0 !important;
-  outline-style: none !important;
-  outline-color: transparent !important;
   box-shadow: none !important;
-  -webkit-tap-highlight-color: transparent !important;
 }
 
+/* Keep focus visible for keyboard users */
+*:focus-visible {
+  outline: 2px solid var(--color-accent, #6366F1) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2) !important;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-accent, #6366F1) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Remove tap highlight on mobile */
 button {
   -webkit-tap-highlight-color: transparent;
-  outline: none;
 }
 
 button::-moz-focus-inner {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Search, FileText } from 'lucide-react';
 import { getNotes, Note } from '../lib/storage';
+import { logger } from '../utils/logger';
 
 interface NoteReferenceModalProps {
   isOpen: boolean;
@@ -37,7 +38,7 @@ export default function NoteReferenceModal({
       const availableNotes = allNotes.filter((note) => note.id !== currentNoteId);
       setNotes(availableNotes);
     } catch (error) {
-      console.error('Error loading notes:', error);
+      logger.error('Error loading notes:', error);
       setNotes([]);
     }
   };

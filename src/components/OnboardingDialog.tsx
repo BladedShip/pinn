@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Folder, Info, AlertCircle, CheckCircle2, ShieldCheck, HardDrive, Book, ArrowRight } from 'lucide-react';
 import { requestDirectoryAccess, setDirectoryHandle, isFileSystemSupported, migrateFromLocalStorage } from '../lib/fileSystemStorage';
+import { logger } from '../utils/logger';
 
 interface OnboardingDialogProps {
   onComplete: () => void;
@@ -50,7 +51,7 @@ export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) 
             localStorage.removeItem('pinn.folders');
           }
         } catch (migrationError: any) {
-          console.error('Migration error:', migrationError);
+          logger.error('Migration error:', migrationError);
           setError(`Migration failed: ${migrationError.message}. Your data is still in browser storage.`);
           setIsMigrating(false);
           return;
@@ -62,7 +63,7 @@ export default function OnboardingDialog({ onComplete }: OnboardingDialogProps) 
         onComplete();
       }, migrationComplete ? 1500 : 500);
     } catch (err: any) {
-      console.error('Error selecting folder:', err);
+      logger.error('Error selecting folder:', err);
       setError(err.message || 'Failed to select folder. Please try again.');
       setIsSelecting(false);
     }

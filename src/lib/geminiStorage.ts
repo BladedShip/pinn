@@ -3,6 +3,7 @@ import {
   hasDirectoryAccess,
   getDirectoryHandle 
 } from './fileSystemStorage';
+import { logger } from '../utils/logger';
 
 const GEMINI_API_KEY_STORAGE_KEY = 'pinn.gemini_api_key';
 const GEMINI_API_KEY_FILE = 'geminiApiKey.json';
@@ -28,7 +29,7 @@ export async function getGeminiApiKey(): Promise<string | null> {
           }
         } catch (error: any) {
           if (error.name !== 'NotFoundError') {
-            console.warn('Error reading Gemini API key from file:', error);
+            logger.warn('Error reading Gemini API key from file:', error);
           }
         }
       }
@@ -61,15 +62,15 @@ export async function saveGeminiApiKey(apiKey: string): Promise<void> {
           const jsonString = JSON.stringify({ apiKey }, null, 2);
           await writable.write(jsonString);
           await writable.close();
-          console.log('Successfully saved Gemini API key to file');
+          logger.log('Successfully saved Gemini API key to file');
         } catch (error) {
-          console.error('Error saving Gemini API key to file:', error);
+          logger.error('Error saving Gemini API key to file:', error);
           // Continue - localStorage is already saved
         }
       }
     }
   } catch (error) {
-    console.error('Error saving Gemini API key:', error);
+    logger.error('Error saving Gemini API key:', error);
   }
 }
 
@@ -88,13 +89,13 @@ export async function deleteGeminiApiKey(): Promise<void> {
           await dirHandle.removeEntry(GEMINI_API_KEY_FILE);
         } catch (error: any) {
           if (error.name !== 'NotFoundError') {
-            console.error('Error deleting Gemini API key file:', error);
+            logger.error('Error deleting Gemini API key file:', error);
           }
         }
       }
     }
   } catch (error) {
-    console.error('Error deleting Gemini API key:', error);
+    logger.error('Error deleting Gemini API key:', error);
   }
 }
 

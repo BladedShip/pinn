@@ -7,6 +7,7 @@ import { refreshStorage, getNotes, Note, writeAll } from '../lib/storage';
 import { refreshFlowStorage, getFlows, Flow, writeAll as writeAllFlows } from '../lib/flowStorage';
 import { getTheme, saveTheme, applyTheme, Theme } from '../lib/themeStorage';
 import { getCloudConfig, saveCloudConfig, clearCloudConfig, uploadToCloud, downloadFromCloud, saveDownloadedData, validateCloudConfig, CloudConfig } from '../lib/cloudSync';
+import { logger } from '../utils/logger';
 import Toast from './Toast';
 import SyncSelectionDialog from './SyncSelectionDialog';
 import DownloadSelectionDialog from './DownloadSelectionDialog';
@@ -79,7 +80,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         setIsCloudConfigured(false);
       }
     } catch (error) {
-      console.error('Error loading cloud config:', error);
+      logger.error('Error loading cloud config:', error);
       // Reset to default on error
       setCloudConfig({
         apiKey: '',
@@ -110,7 +111,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         setFolderError('Failed to restore access. Please try selecting the folder again.');
       }
     } catch (error: any) {
-      console.error('Error restoring access:', error);
+      logger.error('Error restoring access:', error);
       setFolderError(error.message || 'Failed to restore access. Please try again.');
     } finally {
       setIsRestoringAccess(false);
@@ -137,7 +138,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         onClose();
       }, 200);
     } catch (error) {
-      console.error('Error saving settings:', error);
+      logger.error('Error saving settings:', error);
       setIsSaving(false);
     }
   };
@@ -154,7 +155,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         setApiKey('');
         setToast({ message: 'Gemini API key removed successfully', type: 'success' });
       } catch (error) {
-        console.error('Error deleting Gemini API key:', error);
+        logger.error('Error deleting Gemini API key:', error);
         setToast({ message: 'Error removing API key', type: 'error' });
       }
     }
@@ -197,7 +198,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
-        console.error('Error changing folder:', error);
+        logger.error('Error changing folder:', error);
         setFolderError(error.message || 'Failed to change folder. Please try again.');
       }
     } finally {
@@ -271,7 +272,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         type: 'success' 
       });
     } catch (error) {
-      console.error('Error syncing to cloud:', error);
+      logger.error('Error syncing to cloud:', error);
       setToast({ 
         message: `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         type: 'error' 
@@ -323,7 +324,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         selections.selectedFlows
       );
       
-      console.log('Downloaded data:', Object.keys(data), data);
+      logger.log('Downloaded data:', Object.keys(data), data);
       
       if (Object.keys(data).length === 0) {
         setToast({ 
@@ -357,7 +358,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         type: 'success' 
       });
     } catch (error) {
-      console.error('Error downloading from cloud:', error);
+      logger.error('Error downloading from cloud:', error);
       setToast({ 
         message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         type: 'error' 
@@ -436,9 +437,9 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
           // Wait a bit for async write to complete
           await new Promise(resolve => setTimeout(resolve, 100));
 
-          console.log(`Merged notes: ${mergedCount} updated, ${addedCount} added`);
+          logger.log(`Merged notes: ${mergedCount} updated, ${addedCount} added`);
         } catch (e) {
-          console.warn('Error merging notes:', e);
+          logger.warn('Error merging notes:', e);
         }
       }
 
@@ -475,9 +476,9 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
           // Wait a bit for async write to complete
           await new Promise(resolve => setTimeout(resolve, 100));
 
-          console.log(`Merged flows: ${mergedCount} updated, ${addedCount} added`);
+          logger.log(`Merged flows: ${mergedCount} updated, ${addedCount} added`);
         } catch (e) {
-          console.warn('Error merging flows:', e);
+          logger.warn('Error merging flows:', e);
         }
       }
 
@@ -491,7 +492,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
           const mergedFolders = Array.from(new Set([...localFolders, ...downloadedFolders]));
           // Folders are managed automatically when notes are saved, so we don't need to save separately
         } catch (e) {
-          console.warn('Error merging folders:', e);
+          logger.warn('Error merging folders:', e);
         }
       }
 
@@ -502,7 +503,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
           const mergedCategories = Array.from(new Set([...localCategories, ...downloadedCategories]));
           // Categories are managed automatically when flows are saved
         } catch (e) {
-          console.warn('Error merging categories:', e);
+          logger.warn('Error merging categories:', e);
         }
       }
 
@@ -530,7 +531,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         type: 'success' 
       });
     } catch (error) {
-      console.error('Error merging from cloud:', error);
+      logger.error('Error merging from cloud:', error);
       setToast({ 
         message: `Merge failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         type: 'error' 
@@ -562,7 +563,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
         selections.selectedFlows
       );
 
-      console.log('Downloaded data for ZIP:', Object.keys(data), data);
+      logger.log('Downloaded data for ZIP:', Object.keys(data), data);
 
       if (Object.keys(data).length === 0) {
         setToast({ 
@@ -607,7 +608,7 @@ export default function SettingsDialog({ isOpen, onClose, onFolderChange }: Sett
       });
     } catch (error: any) {
       if (error.name !== 'AbortError') {
-        console.error('Error downloading to folder:', error);
+        logger.error('Error downloading to folder:', error);
         setToast({ 
           message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
           type: 'error' 

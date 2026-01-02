@@ -6,6 +6,9 @@ import ConfirmDialog from './ConfirmDialog';
 import Toast from './Toast';
 import SettingsDialog from './SettingsDialog';
 import JSZip from 'jszip';
+import { logger } from '../utils/logger';
+import { useClickOutside } from '../hooks/useClickOutside';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface NotesPageProps {
   onNavigateToEditor: (noteId?: string) => void;
@@ -46,38 +49,30 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   useEffect(() => {
     loadNotes();
-    
+
     // Listen for storage refresh events (e.g., after folder restore)
     const handleStorageRefresh = () => {
       loadNotes();
     };
-    
+
     window.addEventListener('storage-refresh', handleStorageRefresh);
-    
+
     return () => {
       window.removeEventListener('storage-refresh', handleStorageRefresh);
     };
   }, []);
 
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
   useEffect(() => {
     filterAndSortNotes();
-  }, [notes, searchQuery, sortBy, selectedFolder, dateFilter, tagFilter]);
+  }, [notes, debouncedSearchQuery, sortBy, selectedFolder, dateFilter, tagFilter]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-
+  useClickOutside(menuRef, () => {
     if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      setMenuOpen(false);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuOpen]);
+  });
 
   const loadNotes = () => {
     try {
@@ -90,7 +85,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
         setExpandedFolders(new Set(allFolders));
       }
     } catch (error) {
-      console.error('Error loading notes:', error);
+      logger.error('Error loading notes:', error);
     } finally {
       setLoading(false);
     }
@@ -152,12 +147,12 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
     // Sort notes within each folder by updated_at
     Object.keys(organized).forEach((folder) => {
-      organized[folder].sort((a, b) => 
+      organized[folder].sort((a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
     });
 
-    unfiled.sort((a, b) => 
+    unfiled.sort((a, b) =>
       new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
 
@@ -167,8 +162,8 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
   const filterAndSortNotes = () => {
     let filtered = notes;
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = notes.filter(
         (note) =>
           note.title.toLowerCase().includes(query) ||
@@ -356,7 +351,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
     try {
       const zip = new JSZip();
-      
+
       // Add each note as an individual JSON file
       allNotes.forEach((note) => {
         const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
@@ -377,7 +372,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       URL.revokeObjectURL(url);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      logger.error('Error creating ZIP file:', error);
       setToast({
         isOpen: true,
         message: 'Failed to create export file.',
@@ -401,7 +396,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
     try {
       const zip = new JSZip();
-      
+
       // Add each note as an individual Markdown file
       allNotes.forEach((note) => {
         const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
@@ -423,7 +418,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       URL.revokeObjectURL(url);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      logger.error('Error creating ZIP file:', error);
       setToast({
         isOpen: true,
         message: 'Failed to create export file.',
@@ -446,12 +441,12 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
         try {
           const content = event.target?.result as string;
           const importedData = JSON.parse(content);
-          
+
           // Handle both single note and array of notes
           const notesToImport = Array.isArray(importedData) ? importedData : [importedData];
-          
+
           // Validate notes structure
-          const validNotes = notesToImport.filter((note: any) => 
+          const validNotes = notesToImport.filter((note: any) =>
             note && typeof note === 'object' && note.title !== undefined && note.content !== undefined
           );
 
@@ -490,7 +485,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
           });
           setMenuOpen(false);
         } catch (error) {
-          console.error('Error importing notes:', error);
+          logger.error('Error importing notes:', error);
           setToast({
             isOpen: true,
             message: 'Failed to import notes. Please ensure the file is a valid JSON file.',
@@ -517,10 +512,10 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
   const getPreview = (content: string, maxLength: number = 100) => {
     if (!content) return 'No content';
-    
+
     // Convert markdown to plain text more intelligently
     let text = content;
-    
+
     // Handle markdown tables - extract text from table rows
     text = text.replace(/\|(.+)\|/g, (_match, content: string) => {
       // Skip separator rows (like |-----: |-----: |)
@@ -529,125 +524,125 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       const cells = content.split('|').map((c: string) => c.trim()).filter((c: string) => c && !c.match(/^[-:]+$/));
       return cells.join(' ');
     });
-    
+
     // Remove markdown headers
     text = text.replace(/^#{1,6}\s+(.+)$/gm, '$1');
-    
+
     // Remove markdown links but keep the text
     text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-    
+
     // Remove markdown images but keep alt text
     text = text.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1');
-    
+
     // Remove markdown code blocks
     text = text.replace(/```[\s\S]*?```/g, '');
-    
+
     // Remove inline code
     text = text.replace(/`([^`]+)`/g, '$1');
-    
+
     // Remove markdown lists markers
     text = text.replace(/^[\s]*[-*+]\s+/gm, '');
     text = text.replace(/^[\s]*\d+\.\s+/gm, '');
-    
+
     // Remove markdown bold/italic markers
     text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
     text = text.replace(/\*([^*]+)\*/g, '$1');
     text = text.replace(/__([^_]+)__/g, '$1');
     text = text.replace(/_([^_]+)_/g, '$1');
-    
+
     // Remove markdown strikethrough
     text = text.replace(/~~([^~]+)~~/g, '$1');
-    
+
     // Remove markdown blockquotes
     text = text.replace(/^>\s+/gm, '');
-    
+
     // Remove horizontal rules
     text = text.replace(/^[-*_]{3,}$/gm, '');
-    
+
     // Remove remaining markdown special characters (but keep pipes and colons for content)
     // IMPORTANT: Don't remove # as we want to preserve tags
     text = text.replace(/[`\[\]()]/g, '');
-    
+
     // Clean up extra whitespace
     text = text.replace(/\n{3,}/g, '\n\n');
     text = text.replace(/\s+/g, ' ');
     text = text.trim();
-    
+
     if (!text || text.length === 0) return 'No content';
-    
+
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
   const renderPreviewWithTags = (content: string, maxLength: number = 100) => {
     if (!content) return <span className="text-gray-500">No content</span>;
-    
+
     // Convert markdown to plain text (similar to getPreview but preserve tags)
     let text = content;
-    
+
     // Handle markdown tables - extract text from table rows
     text = text.replace(/\|(.+)\|/g, (_match, content: string) => {
       if (content.match(/^[\s-:]+$/)) return '';
       const cells = content.split('|').map((c: string) => c.trim()).filter((c: string) => c && !c.match(/^[-:]+$/));
       return cells.join(' ');
     });
-    
+
     // Remove markdown headers (but preserve #tags)
     text = text.replace(/^#{1,6}\s+(.+)$/gm, '$1');
-    
+
     // Remove markdown links but keep the text
     text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-    
+
     // Remove markdown images but keep alt text
     text = text.replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1');
-    
+
     // Remove markdown code blocks
     text = text.replace(/```[\s\S]*?```/g, '');
-    
+
     // Remove inline code
     text = text.replace(/`([^`]+)`/g, '$1');
-    
+
     // Remove markdown lists markers
     text = text.replace(/^[\s]*[-*+]\s+/gm, '');
     text = text.replace(/^[\s]*\d+\.\s+/gm, '');
-    
+
     // Remove markdown bold/italic markers
     text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
     text = text.replace(/\*([^*]+)\*/g, '$1');
     text = text.replace(/__([^_]+)__/g, '$1');
     text = text.replace(/_([^_]+)_/g, '$1');
-    
+
     // Remove markdown strikethrough
     text = text.replace(/~~([^~]+)~~/g, '$1');
-    
+
     // Remove markdown blockquotes
     text = text.replace(/^>\s+/gm, '');
-    
+
     // Remove horizontal rules
     text = text.replace(/^[-*_]{3,}$/gm, '');
-    
+
     // Remove remaining markdown special characters (but keep # for tags)
     text = text.replace(/[`\[\]()]/g, '');
-    
+
     // Clean up extra whitespace
     text = text.replace(/\n{3,}/g, '\n\n');
     text = text.replace(/\s+/g, ' ');
     text = text.trim();
-    
+
     if (!text || text.length === 0) return <span className="text-gray-500">No content</span>;
-    
+
     // Check if we need to truncate
     const needsTruncation = text.length > maxLength;
     const displayText = needsTruncation ? text.substring(0, maxLength) : text;
-    
+
     // Split text by tags while preserving the tags
     const tagRegex = /(#\w+)/g;
     const parts: Array<{ text: string; isTag: boolean }> = [];
     let lastIndex = 0;
     let match;
-    
+
     // Reset regex lastIndex
     tagRegex.lastIndex = 0;
-    
+
     while ((match = tagRegex.exec(displayText)) !== null) {
       // Add text before tag
       if (match.index > lastIndex) {
@@ -657,12 +652,12 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
       parts.push({ text: match[0], isTag: true });
       lastIndex = match.index + match[0].length;
     }
-    
+
     // Add remaining text after last tag
     if (lastIndex < displayText.length) {
       parts.push({ text: displayText.substring(lastIndex), isTag: false });
     }
-    
+
     // If no tags found, return plain text
     if (parts.length === 0) {
       return (
@@ -672,7 +667,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
         </span>
       );
     }
-    
+
     return (
       <span>
         {parts.map((part, index) => {
@@ -791,7 +786,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Sidebar */}
-        <aside 
+        <aside
           className="bg-theme-bg-primary border-r border-theme-border w-[280px] min-w-[200px] flex-shrink-0 h-full flex flex-col"
         >
           {/* Fixed Header Section */}
@@ -812,11 +807,10 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
             <div className="mb-2">
               <button
                 onClick={() => handleFolderClick('All')}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedFolder === 'All'
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${selectedFolder === 'All'
                     ? 'bg-theme-bg-secondary text-theme-text-primary'
                     : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
-                }`}
+                  }`}
               >
                 <Book className="w-4 h-4" />
                 <span className="flex-1 text-left">All Notes</span>
@@ -829,11 +823,10 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
               <div className="mb-2">
                 <button
                   onClick={() => handleFolderClick('Unfiled')}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedFolder === 'Unfiled'
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${selectedFolder === 'Unfiled'
                       ? 'bg-theme-bg-secondary text-white'
                       : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
-                  }`}
+                    }`}
                 >
                   <Book className="w-4 h-4" />
                   <span className="flex-1 text-left">Unfiled</span>
@@ -849,6 +842,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                 onClick={handleCreateFolder}
                 className="text-xs text-gray-500 hover:text-theme-text-primary p-1"
                 title="New Folder"
+                aria-label="Create new folder"
               >
                 <Plus className="w-3 h-3" />
               </button>
@@ -856,9 +850,9 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
           </div>
 
           {/* Scrollable Folders List */}
-          <div 
+          <div
             className="flex-1 overflow-y-auto sidebar-scroll-container px-4 pb-4"
-            style={{ 
+            style={{
               scrollbarWidth: 'none', /* Firefox */
               msOverflowStyle: 'none', /* IE and Edge */
             }}
@@ -877,39 +871,39 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                 </div>
               )}
               {sortedFolders.map((folderName) => {
-                  const folderNotes = organized[folderName] || [];
-                  const isExpanded = expandedFolders.has(folderName);
-                  const filteredFolderNotes = searchQuery
-                    ? folderNotes.filter(
-                        (note) =>
-                          note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          note.content.toLowerCase().includes(searchQuery.toLowerCase())
-                      )
-                    : folderNotes;
+                const folderNotes = organized[folderName] || [];
+                const isExpanded = expandedFolders.has(folderName);
+                const filteredFolderNotes = debouncedSearchQuery
+                  ? folderNotes.filter(
+                    (note) =>
+                      note.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                      note.content.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+                  )
+                  : folderNotes;
 
-                  return (
-                    <div key={folderName} className="mb-1">
-                      <div className="flex items-center gap-2">
+                return (
+                  <div key={folderName} className="mb-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleFolder(folderName)}
+                        className="p-1 text-gray-500 hover:text-theme-text-primary transition-colors"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
+                        aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
+                      <div className={`group flex-1 flex items-center gap-2 px-1 rounded-lg text-sm min-w-0`}>
                         <button
-                          onClick={() => toggleFolder(folderName)}
-                          className="p-1 text-gray-500 hover:text-theme-text-primary transition-colors"
-                          title={isExpanded ? 'Collapse' : 'Expand'}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                        </button>
-                        <div className={`group flex-1 flex items-center gap-2 px-1 rounded-lg text-sm min-w-0`}>
-                          <button
-                            onClick={() => handleFolderClick(folderName)}
-                            className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg transition-colors min-w-0 ${
-                              selectedFolder === folderName
-                                ? 'bg-theme-bg-secondary text-white'
-                                : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
+                          onClick={() => handleFolderClick(folderName)}
+                          className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg transition-colors min-w-0 ${selectedFolder === folderName
+                              ? 'bg-theme-bg-secondary text-white'
+                              : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
                             }`}
-                          >
+                        >
                           {isExpanded ? (
                             <FolderOpen className="w-4 h-4 flex-shrink-0" />
                           ) : (
@@ -918,61 +912,66 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                           <span className="flex-1 text-left truncate">
                             {folderName}
                           </span>
+                        </button>
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-2">
+                          <button
+                            title="Rename folder"
+                            onClick={() => handleRenameFolder(folderName)}
+                            className="p-1 text-gray-500 hover:text-theme-text-primary rounded"
+                            aria-label="Rename folder"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-2">
-                            <button
-                              title="Rename folder"
-                              onClick={() => handleRenameFolder(folderName)}
-                              className="p-1 text-gray-500 hover:text-theme-text-primary rounded"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              title="Delete folder"
-                              onClick={() => handleDeleteFolderClick(folderName)}
-                              className="p-1 text-gray-500 hover:text-red-400 rounded"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          <button
+                            title="Delete folder"
+                            onClick={() => handleDeleteFolderClick(folderName)}
+                            className="p-1 text-gray-500 hover:text-red-400 rounded"
+                            aria-label="Delete folder"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                      {isExpanded && filteredFolderNotes.length > 0 && (
-                        <div className="ml-7 mt-1 space-y-0.5">
-                          {filteredFolderNotes.map((note) => (
-                            <div key={note.id} className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary transition-colors truncate min-w-0">
-                              <Book className="w-3 h-3 flex-shrink-0" />
-                              <button
-                                onClick={() => onNavigateToEditor(note.id)}
-                                className="flex-1 text-left truncate"
-                                title={note.title}
-                              >
-                                {note.title}
-                              </button>
-                              <button
-                                title="Edit note"
-                                onClick={() => onNavigateToEditor(note.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-theme-text-primary rounded"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </button>
-                              <button
-                                title="Delete note"
-                                onClick={() => {
-                                  setNoteToDelete(note.id);
-                                  setShowDeleteConfirm(true);
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
+                    {isExpanded && filteredFolderNotes.length > 0 && (
+                      <div className="ml-7 mt-1 space-y-0.5">
+                        {filteredFolderNotes.map((note) => (
+                          <div key={note.id} className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary transition-colors truncate min-w-0">
+                            <Book className="w-3 h-3 flex-shrink-0" />
+                            <button
+                              onClick={() => onNavigateToEditor(note.id)}
+                              className="flex-1 text-left truncate"
+                              title={note.title}
+                            >
+                              {note.title}
+                            </button>
+                            <button
+                              title="Edit note"
+                              onClick={() => onNavigateToEditor(note.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-theme-text-primary rounded"
+                              aria-label="Edit note"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              title="Delete note"
+                              onClick={() => {
+                                setNoteToDelete(note.id);
+
+                                setShowDeleteConfirm(true);
+                              }}
+                              aria-label="Delete note"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Empty state intentionally minimal - no extra call-to-action here */}
               {sortedFolders.length === 0 && unfiled.length === 0 && !loading && null}
@@ -1035,9 +1034,9 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
           </div>
 
           {/* Scrollable Notes List */}
-          <div 
+          <div
             className="flex-1 overflow-y-auto content-scroll-container"
-            style={{ 
+            style={{
               scrollbarWidth: 'none', /* Firefox */
               msOverflowStyle: 'none', /* IE and Edge */
             }}
@@ -1089,6 +1088,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                             onClick={(e) => handleDeleteNote(note.id, e)}
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-theme-bg-primary rounded transition-all"
                             title="Delete note"
+                            aria-label="Delete note"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1099,7 +1099,7 @@ export default function NotesPage({ onNavigateToEditor, onNavigateToHome, onNavi
                 </div>
               ) : (
                 <div className="text-center text-gray-500 py-12">
-                  {searchQuery ? 'No notes found' : selectedFolder === 'All' ? 'No notes yet. Create your first note!' : `No notes in "${selectedFolder}"`}
+                  {debouncedSearchQuery ? 'No notes found' : selectedFolder === 'All' ? 'No notes yet. Create your first note!' : `No notes in "${selectedFolder}"`}
                 </div>
               )}
             </div>

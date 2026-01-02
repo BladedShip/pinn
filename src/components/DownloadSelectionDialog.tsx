@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Check, Search, FileText, GitBranch, Folder, Loader2 } from 'lucide-react';
 import { CloudConfig, downloadFileFromCloud, getUserId } from '../lib/cloudSync';
+import { logger } from '../utils/logger';
 
 interface Note {
   id: string;
@@ -115,7 +116,7 @@ export default function DownloadSelectionDialog({ isOpen, onClose, onConfirm, cl
         setError('No notes or flows found in cloud. Make sure you have synced data first.');
       }
     } catch (err) {
-      console.error('Error loading cloud data:', err);
+      logger.error('Error loading cloud data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data from cloud');
     } finally {
       setIsLoading(false);

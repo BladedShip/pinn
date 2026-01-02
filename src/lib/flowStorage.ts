@@ -6,6 +6,7 @@ import {
   isFolderConfigured,
   hasDirectoryAccess 
 } from './fileSystemStorage';
+import { logger } from '../utils/logger';
 
 export interface FlowNode {
   id: string;
@@ -78,24 +79,24 @@ async function initialize(): Promise<void> {
     try {
       const folderConfigured = isFolderConfigured();
       let hasAccess = hasDirectoryAccess();
-      console.log('Flows storage initialization:', { folderConfigured, hasAccess });
+      logger.log('Flows storage initialization:', { folderConfigured, hasAccess });
       
       // If folder is configured but handle isn't available, try to restore it
       // This is important because initializeDirectoryHandle might have been called before
       // but failed silently, so we try again here with a small delay
       if (folderConfigured && !hasAccess) {
-        console.log('Flows storage initialization: Folder configured but handle not available, attempting to restore...');
+        logger.log('Flows storage initialization: Folder configured but handle not available, attempting to restore...');
         const { initializeDirectoryHandle } = await import('./fileSystemStorage');
         // Give a small delay to ensure any previous initialization attempts have completed
         await new Promise(resolve => setTimeout(resolve, 50));
         await initializeDirectoryHandle();
         hasAccess = hasDirectoryAccess();
-        console.log('Flows storage initialization: After handle restoration attempt, hasAccess:', hasAccess);
+        logger.log('Flows storage initialization: After handle restoration attempt, hasAccess:', hasAccess);
       }
       
       if (folderConfigured && hasAccess) {
         // Load from file system
-        console.log('Loading flows and categories from file system...');
+        logger.log('Loading flows and categories from file system...');
         const loadedFlows = await readFlowsFromFile();
         const loadedCategories = await readCategoriesFromFile();
         
@@ -103,20 +104,20 @@ async function initialize(): Promise<void> {
         if (Array.isArray(loadedFlows)) {
           flowsCache = normalizeFlows(loadedFlows);
         } else {
-          console.warn('Invalid flows data loaded, keeping existing cache or empty array');
+          logger.warn('Invalid flows data loaded, keeping existing cache or empty array');
           flowsCache = flowsCache ? normalizeFlows(flowsCache) : [];
         }
         
         if (Array.isArray(loadedCategories)) {
           categoriesCache = loadedCategories;
         } else {
-          console.warn('Invalid categories data loaded, keeping existing cache or empty array');
+          logger.warn('Invalid categories data loaded, keeping existing cache or empty array');
           categoriesCache = categoriesCache || [];
         }
         
-        console.log(`Initialized flows storage: ${flowsCache.length} flows, ${categoriesCache.length} categories`);
+        logger.log(`Initialized flows storage: ${flowsCache.length} flows, ${categoriesCache.length} categories`);
       } else {
-        console.log('Using localStorage fallback for flows (folder configured:', folderConfigured, ', has access:', hasAccess, ')');
+        logger.log('Using localStorage fallback for flows (folder configured:', folderConfigured, ', has access:', hasAccess, ')');
         // Fallback to localStorage
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
@@ -142,10 +143,10 @@ async function initialize(): Promise<void> {
         } catch {
           categoriesCache = [];
         }
-        console.log(`Initialized flows storage from localStorage: ${flowsCache.length} flows, ${categoriesCache.length} categories`);
+        logger.log(`Initialized flows storage from localStorage: ${flowsCache.length} flows, ${categoriesCache.length} categories`);
       }
     } catch (error) {
-      console.error('Error initializing flows storage:', error);
+      logger.error('Error initializing flows storage:', error);
       flowsCache = [];
       categoriesCache = [];
     }
@@ -165,43 +166,43 @@ async function writeAllAsync(flows: Flow[]): Promise<void> {
     const folderConfigured = isFolderConfigured();
     const hasAccess = hasDirectoryAccess();
     
-    console.log('Writing flows:', { count: flows.length, folderConfigured, hasAccess });
+    logger.log('Writing flows:', { count: flows.length, folderConfigured, hasAccess });
     
     if (folderConfigured) {
       // If folder is configured, we MUST use file system
       if (hasAccess) {
-        console.log('Writing flows to file system...');
+        logger.log('Writing flows to file system...');
         await writeFlowsToFile(flows);
-        console.log('Successfully wrote flows to file system');
+        logger.log('Successfully wrote flows to file system');
       } else {
         // Try to restore the handle
-        console.warn('Folder configured but handle not available. Attempting to restore...');
+        logger.warn('Folder configured but handle not available. Attempting to restore...');
         const { initializeDirectoryHandle } = await import('./fileSystemStorage');
         await initializeDirectoryHandle();
         
         if (hasDirectoryAccess()) {
-          console.log('Handle restored, writing to file system...');
+          logger.log('Handle restored, writing to file system...');
           await writeFlowsToFile(flows);
-          console.log('Successfully wrote flows to file system after handle restoration');
+          logger.log('Successfully wrote flows to file system after handle restoration');
         } else {
-          console.error('ERROR: Folder is configured but cannot access directory handle! Data not persisted.');
+          logger.error('ERROR: Folder is configured but cannot access directory handle! Data not persisted.');
           localStorage.setItem(STORAGE_KEY, JSON.stringify(flows));
-          console.warn('Wrote to localStorage as fallback - this should not happen if folder is configured!');
+          logger.warn('Wrote to localStorage as fallback - this should not happen if folder is configured!');
         }
       }
     } else {
       // No folder configured, use localStorage
-      console.log('No folder configured, writing to localStorage');
+      logger.log('No folder configured, writing to localStorage');
       localStorage.setItem(STORAGE_KEY, JSON.stringify(flows));
     }
   } catch (error) {
-    console.error('Error writing flows:', error);
+    logger.error('Error writing flows:', error);
     // Try localStorage as backup
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(flows));
-      console.warn('Wrote to localStorage as backup due to error');
+      logger.warn('Wrote to localStorage as backup due to error');
     } catch (localError) {
-      console.error('Failed to write to localStorage backup:', localError);
+      logger.error('Failed to write to localStorage backup:', localError);
     }
   }
 }
@@ -250,7 +251,7 @@ async function writeCategories(categories: string[]): Promise<void> {
         if (hasDirectoryAccess()) {
           await writeCategoriesToFile(unique);
         } else {
-          console.error('ERROR: Cannot write categories - folder configured but handle unavailable!');
+          logger.error('ERROR: Cannot write categories - folder configured but handle unavailable!');
           localStorage.setItem(CATEGORIES_KEY, JSON.stringify(unique));
         }
       }
@@ -258,11 +259,11 @@ async function writeCategories(categories: string[]): Promise<void> {
       localStorage.setItem(CATEGORIES_KEY, JSON.stringify(unique));
     }
   } catch (error) {
-    console.error('Error writing categories:', error);
+    logger.error('Error writing categories:', error);
     try {
       localStorage.setItem(CATEGORIES_KEY, JSON.stringify(unique));
     } catch (localError) {
-      console.error('Failed to write categories to localStorage backup:', localError);
+      logger.error('Failed to write categories to localStorage backup:', localError);
     }
   }
 }
@@ -305,7 +306,7 @@ export async function refreshFlowStorage(): Promise<void> {
 // Synchronous wrapper for backward compatibility (non-blocking write)
 export function writeAll(flows: Flow[]): void {
   flowsCache = flows;
-  writeAllAsync(flows).catch(console.error);
+  writeAllAsync(flows).catch(logger.error);
 }
 
 export function getFlows(): Flow[] {
@@ -413,7 +414,7 @@ export function setFlowCategory(id: string, category: string | undefined): Flow 
     const list = readCategories();
     if (!list.includes(normalized)) {
       list.push(normalized);
-      writeCategories(list).catch(console.error); // Non-blocking async write
+      writeCategories(list).catch(logger.error); // Non-blocking async write
     }
   }
   return next;
@@ -435,7 +436,7 @@ export function addCategory(name: string): void {
   const list = readCategories();
   if (!list.includes(normalized)) {
     list.push(normalized);
-    writeCategories(list).catch(console.error); // Non-blocking async write
+    writeCategories(list).catch(logger.error); // Non-blocking async write
   }
 }
 
@@ -456,7 +457,7 @@ export function renameCategory(oldName: string, newName: string): { updatedCount
   // update category list
   const list = readCategories().filter((c) => c !== source);
   list.push(target);
-  writeCategories(list).catch(console.error); // Non-blocking async write
+  writeCategories(list).catch(logger.error); // Non-blocking async write
   return { updatedCount: updated };
 }
 
@@ -486,6 +487,6 @@ export function deleteCategory(
   }
   writeAll(next); // Non-blocking async write
   // remove category from list
-  writeCategories(readCategories().filter((c) => c !== target)).catch(console.error); // Non-blocking async write
+  writeCategories(readCategories().filter((c) => c !== target)).catch(logger.error); // Non-blocking async write
   return { affectedCount: affected };
 }

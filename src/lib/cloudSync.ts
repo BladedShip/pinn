@@ -8,6 +8,7 @@ import {
   hasDirectoryAccess,
   getDirectoryHandle 
 } from './fileSystemStorage';
+import { logger } from '../utils/logger';
 
 export interface CloudConfig {
   apiKey: string;
@@ -46,7 +47,7 @@ export async function getCloudConfig(): Promise<CloudConfig | null> {
     if (error.name === 'NotFoundError') {
       return null;
     }
-    console.error('Error reading cloud config:', error);
+    logger.error('Error reading cloud config:', error);
     return null;
   }
 }
@@ -72,7 +73,7 @@ export async function saveCloudConfig(config: CloudConfig): Promise<void> {
     await writable.write(JSON.stringify(config, null, 2));
     await writable.close();
   } catch (error) {
-    console.error('Error saving cloud config:', error);
+    logger.error('Error saving cloud config:', error);
     // Fallback to localStorage
     localStorage.setItem('pinn.cloudConfig', JSON.stringify(config));
   }
@@ -94,7 +95,7 @@ export async function clearCloudConfig(): Promise<void> {
     await dirHandle.removeEntry(CONFIG_FILE);
   } catch (error: any) {
     if (error.name !== 'NotFoundError') {
-      console.error('Error clearing cloud config:', error);
+      logger.error('Error clearing cloud config:', error);
     }
     localStorage.removeItem('pinn.cloudConfig');
   }
@@ -130,7 +131,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
             notesContent = JSON.stringify(filteredNotes);
           }
         } catch (e) {
-          console.warn('Error filtering notes:', e);
+          logger.warn('Error filtering notes:', e);
         }
       }
       dataFiles.push({ name: 'notes.json', content: notesContent });
@@ -150,7 +151,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
             flowsContent = JSON.stringify(filteredFlows);
           }
         } catch (e) {
-          console.warn('Error filtering flows:', e);
+          logger.warn('Error filtering flows:', e);
         }
       }
       dataFiles.push({ name: 'flows.json', content: flowsContent });
@@ -184,7 +185,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
               content = JSON.stringify(filteredNotes);
             }
           } catch (e) {
-            console.warn('Error filtering notes:', e);
+            logger.warn('Error filtering notes:', e);
           }
         }
         
@@ -198,7 +199,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
               content = JSON.stringify(filteredFlows);
             }
           } catch (e) {
-            console.warn('Error filtering flows:', e);
+            logger.warn('Error filtering flows:', e);
           }
         }
         
@@ -206,7 +207,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
       }
     } catch (error: any) {
       if (error.name !== 'NotFoundError') {
-        console.warn(`Could not read ${fileName}:`, error);
+        logger.warn(`Could not read ${fileName}:`, error);
       }
     }
   }
@@ -356,7 +357,7 @@ export async function uploadToCloud(
           if (userIds.length > 0) {
             // Use the first user ID found (or you could use the one with most recent data)
             targetUserId = userIds[0];
-            console.log(`Found existing user ID with data: ${targetUserId}, will sync to this location`);
+            logger.log(`Found existing user ID with data: ${targetUserId}, will sync to this location`);
             break;
           }
         }
@@ -369,7 +370,7 @@ export async function uploadToCloud(
   // If no existing user ID found, use current device's user ID
   if (!targetUserId) {
     targetUserId = getUserId();
-    console.log(`No existing data found, using current device user ID: ${targetUserId}`);
+    logger.log(`No existing data found, using current device user ID: ${targetUserId}`);
   }
   
   const dataPath = `users/${targetUserId}`;
@@ -410,7 +411,7 @@ export async function uploadToCloud(
       existingCategories = existingCategoriesData;
     }
   } catch (error) {
-    console.warn('Error downloading existing data for merge, will proceed with upload only:', error);
+    logger.warn('Error downloading existing data for merge, will proceed with upload only:', error);
     // Continue with upload - this might be the first sync
   }
 
@@ -434,10 +435,10 @@ export async function uploadToCloud(
         // Merge: update existing notes and add new ones, but keep all existing notes
         const mergedNotes = mergeItemsById(existingNotes, localNotes);
         notesFile.content = JSON.stringify(mergedNotes);
-        console.log(`Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`);
+        logger.log(`Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`);
       }
     } catch (e) {
-      console.warn('Error merging notes:', e);
+      logger.warn('Error merging notes:', e);
     }
   } else if (existingNotes.length > 0) {
     // If no local notes file but we have existing notes in cloud, preserve them
@@ -453,10 +454,10 @@ export async function uploadToCloud(
         // Merge: update existing flows and add new ones, but keep all existing flows
         const mergedFlows = mergeItemsById(existingFlows, localFlows);
         flowsFile.content = JSON.stringify(mergedFlows);
-        console.log(`Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`);
+        logger.log(`Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`);
       }
     } catch (e) {
-      console.warn('Error merging flows:', e);
+      logger.warn('Error merging flows:', e);
     }
   } else if (existingFlows.length > 0) {
     // If no local flows file but we have existing flows in cloud, preserve them
@@ -473,7 +474,7 @@ export async function uploadToCloud(
         foldersFile.content = JSON.stringify(mergedFolders);
       }
     } catch (e) {
-      console.warn('Error merging folders:', e);
+      logger.warn('Error merging folders:', e);
     }
   } else if (existingFolders.length > 0) {
     dataFiles.push({ name: 'folders.json', content: JSON.stringify(existingFolders) });
@@ -488,7 +489,7 @@ export async function uploadToCloud(
         categoriesFile.content = JSON.stringify(mergedCategories);
       }
     } catch (e) {
-      console.warn('Error merging categories:', e);
+      logger.warn('Error merging categories:', e);
     }
   } else if (existingCategories.length > 0) {
     dataFiles.push({ name: 'flowCategories.json', content: JSON.stringify(existingCategories) });
@@ -580,8 +581,8 @@ export async function uploadToCloud(
 
       if (!response || !response.ok) {
         const errorText = lastError || await response?.text() || 'Unknown error';
-        console.error('Upload error response:', errorText);
-        console.error('Tried URLs:', urlFormats);
+        logger.error('Upload error response:', errorText);
+        logger.error('Tried URLs:', urlFormats);
         
         // Provide helpful error messages
         if (response?.status === 403) {
@@ -602,7 +603,7 @@ export async function uploadToCloud(
         onProgress(uploadProgress);
       }
     } catch (error) {
-      console.error(`Error uploading ${file.name}:`, error);
+      logger.error(`Error uploading ${file.name}:`, error);
       
       // Check if it's a network error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
@@ -662,7 +663,7 @@ export async function uploadToCloud(
       }
     }
   } catch (error) {
-    console.warn('Could not save metadata, but files were uploaded successfully');
+    logger.warn('Could not save metadata, but files were uploaded successfully');
   }
 
   if (onProgress) {
@@ -690,7 +691,7 @@ export async function downloadFromCloud(
   // Try to discover what data exists in the database
   // Since rules only allow access to /users/$userId (not /users), we need to try different approaches
   const userId = getUserId();
-  console.log(`Downloading from database, projectId: ${config.projectId}`);
+  logger.log(`Downloading from database, projectId: ${config.projectId}`);
   
   const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
   let foundUserPath: string | null = null;
@@ -715,7 +716,7 @@ export async function downloadFromCloud(
           const userIds = Object.keys(usersData);
           if (userIds.length > 0) {
             foundUserPath = `users/${userIds[0]}`;
-            console.log(`Found data at path: ${foundUserPath}`);
+            logger.log(`Found data at path: ${foundUserPath}`);
             break;
           }
         }
@@ -731,8 +732,8 @@ export async function downloadFromCloud(
   // But if that returns null for all files, we know it's the wrong user ID
   if (!foundUserPath) {
     foundUserPath = `users/${userId}`;
-    console.log(`Using current user path: ${foundUserPath}`);
-    console.warn(`Note: If downloads return null, the database rules may need to allow reading /users to discover user IDs. Current rules only allow /users/$userId access.`);
+    logger.log(`Using current user path: ${foundUserPath}`);
+    logger.warn(`Note: If downloads return null, the database rules may need to allow reading /users to discover user IDs. Current rules only allow /users/$userId access.`);
   }
   
   const files = ['notes', 'folders', 'flows', 'flowCategories', 'theme', 'cloudConfig']; // Without .json extension
@@ -757,18 +758,18 @@ export async function downloadFromCloud(
       let downloadedData: any = null;
       for (const url of downloadUrls) {
         try {
-          console.log(`Trying to download ${dbName} from: ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+          logger.log(`Trying to download ${dbName} from: ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
           response = await fetch(url);
-          console.log(`Response for ${dbName}: status=${response.status}, ok=${response.ok}`);
+          logger.log(`Response for ${dbName}: status=${response.status}, ok=${response.ok}`);
           
           if (response.ok) {
             const data = await response.json();
-            console.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, isEmpty: ${data && typeof data === 'object' && data !== null && Object.keys(data).length === 0}, keys: ${data && typeof data === 'object' && data !== null ? Object.keys(data).join(',') : 'N/A'}`);
+            logger.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, isEmpty: ${data && typeof data === 'object' && data !== null && Object.keys(data).length === 0}, keys: ${data && typeof data === 'object' && data !== null ? Object.keys(data).join(',') : 'N/A'}`);
             
             // If data is null, it means the path exists but is empty - this is valid, skip it
             // But if we're using the wrong user ID, we should try to find the right one
             if (data === null) {
-              console.log(`Path exists but data is null for ${dbName} at ${foundUserPath} - this user ID may not have data`);
+              logger.log(`Path exists but data is null for ${dbName} at ${foundUserPath} - this user ID may not have data`);
               // Don't break - continue to try other regions, but if all return null, we know this user ID is wrong
               continue;
             }
@@ -777,39 +778,39 @@ export async function downloadFromCloud(
             if (data !== null && data !== undefined) {
               successfulUrl = url;
               downloadedData = data;
-              console.log(`Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+              logger.log(`Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
               break; // Success - exit the loop
             }
           } else if (response.status === 401 || response.status === 403) {
             // Try without auth
             const publicUrl = url.replace('?auth=' + config.apiKey, '');
-            console.log(`Trying without auth: ${publicUrl}`);
+            logger.log(`Trying without auth: ${publicUrl}`);
             response = await fetch(publicUrl);
-            console.log(`Public response for ${dbName}: status=${response.status}, ok=${response.ok}`);
+            logger.log(`Public response for ${dbName}: status=${response.status}, ok=${response.ok}`);
             if (response.ok) {
               const data = await response.json();
-              console.log(`Got public data for ${dbName}, type: ${typeof data}, isNull: ${data === null}`);
+              logger.log(`Got public data for ${dbName}, type: ${typeof data}, isNull: ${data === null}`);
               if (data !== null) {
                 successfulUrl = publicUrl;
                 downloadedData = data;
-                console.log(`Successfully found ${dbName} at public URL`);
+                logger.log(`Successfully found ${dbName} at public URL`);
                 break; // Success with public access - exit the loop
               }
             }
           }
         } catch (err) {
-          console.log(`Error fetching ${url}:`, err);
+          logger.log(`Error fetching ${url}:`, err);
           continue; // Try next URL
         }
       }
       
       if (successfulUrl && downloadedData !== null) {
-        console.log(`Successfully connected to ${dbName} at: ${successfulUrl.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+        logger.log(`Successfully connected to ${dbName} at: ${successfulUrl.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
         
         const data = downloadedData;
         
         // Debug: Log the actual data structure received
-        console.log(`Downloaded ${dbName}:`, {
+        logger.log(`Downloaded ${dbName}:`, {
           type: typeof data,
           hasContent: data?.content !== undefined,
           keys: data && typeof data === 'object' ? Object.keys(data) : 'N/A',
@@ -849,10 +850,10 @@ export async function downloadFromCloud(
               if (Array.isArray(notes)) {
                 const filteredNotes = notes.filter((note: any) => selectedNoteIds.includes(note.id));
                 fileContent = JSON.stringify(filteredNotes);
-                console.log(`Filtered notes: ${notes.length} total, ${filteredNotes.length} selected`);
+                logger.log(`Filtered notes: ${notes.length} total, ${filteredNotes.length} selected`);
               }
             } catch (e) {
-              console.warn('Error filtering notes:', e);
+              logger.warn('Error filtering notes:', e);
             }
           } else if (dbName === 'flows' && selectedFlowIds !== undefined) {
             try {
@@ -860,10 +861,10 @@ export async function downloadFromCloud(
               if (Array.isArray(flows)) {
                 const filteredFlows = flows.filter((flow: any) => selectedFlowIds.includes(flow.id));
                 fileContent = JSON.stringify(filteredFlows);
-                console.log(`Filtered flows: ${flows.length} total, ${filteredFlows.length} selected`);
+                logger.log(`Filtered flows: ${flows.length} total, ${filteredFlows.length} selected`);
               }
             } catch (e) {
-              console.warn('Error filtering flows:', e);
+              logger.warn('Error filtering flows:', e);
             }
           }
 
@@ -874,21 +875,21 @@ export async function downloadFromCloud(
           if (onProgress) {
             onProgress(Math.round((downloadedCount / files.length) * 100));
           }
-          console.log(`Successfully extracted content for ${dbName}`);
+          logger.log(`Successfully extracted content for ${dbName}`);
         } else {
-          console.warn(`File ${dbName} downloaded but content could not be extracted. Data structure:`, typeof data, data);
+          logger.warn(`File ${dbName} downloaded but content could not be extracted. Data structure:`, typeof data, data);
         }
       } else if (response?.status === 404) {
         // File doesn't exist in cloud, skip
-        console.log(`File ${dbName} not found in Realtime Database (404)`);
+        logger.log(`File ${dbName} not found in Realtime Database (404)`);
       } else if (!successfulUrl) {
         // No successful URL found
-        console.log(`File ${dbName} not found in Realtime Database (tried all URL formats)`);
+        logger.log(`File ${dbName} not found in Realtime Database (tried all URL formats)`);
       } else {
-        console.warn(`Could not download ${dbName}: ${response?.status || 'network error'}`);
+        logger.warn(`Could not download ${dbName}: ${response?.status || 'network error'}`);
       }
     } catch (error) {
-      console.error(`Error downloading ${dbName}:`, error);
+      logger.error(`Error downloading ${dbName}:`, error);
       
       // Check if it's a network error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
@@ -899,7 +900,7 @@ export async function downloadFromCloud(
   }
 
   // Log summary of what was downloaded
-  console.log(`Download complete. Files downloaded: ${Object.keys(downloadedFiles).length}`, Object.keys(downloadedFiles));
+  logger.log(`Download complete. Files downloaded: ${Object.keys(downloadedFiles).length}`, Object.keys(downloadedFiles));
   
   // Return whatever files were found, even if empty
   // This allows downloading partial data or handling empty cloud storage gracefully
@@ -942,7 +943,7 @@ export async function saveDownloadedData(data: { [key: string]: string }): Promi
       await writable.write(content);
       await writable.close();
     } catch (error) {
-      console.error(`Error saving ${fileName}:`, error);
+      logger.error(`Error saving ${fileName}:`, error);
       throw error;
     }
   }
@@ -1005,7 +1006,7 @@ export async function validateCloudConfig(config: CloudConfig): Promise<boolean>
     
     return false;
   } catch (error) {
-    console.error('Error validating cloud config:', error);
+    logger.error('Error validating cloud config:', error);
     return false;
   }
 }

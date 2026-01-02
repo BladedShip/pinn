@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+.cache
+*.lock
+bun.lock
+package-lock.json
+yarn.lock
+coverage
+.vscode
+.idea
+*.log
+.env
+.env.local
+.cert
+

@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
+import { Bookmark, Folder, X, AlertCircle, Check } from 'lucide-react';
 import HomePage from './components/HomePage';
 import EditorPage from './components/EditorPage';
 import FlowsPage from './components/FlowsPage';
-import FlowPage from './components/FlowPage';
 import NotesPage from './components/NotesPage';
 import NotFoundPage from './components/NotFoundPage';
 import OnboardingDialog from './components/OnboardingDialog';
-import { Bookmark, Folder, X, AlertCircle, Check } from 'lucide-react';
+import LoadingSpinner from './components/shared/LoadingSpinner';
 import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, hasValidDirectoryAccess, restoreDirectoryAccess, getFolderPath } from './lib/fileSystemStorage';
 import { initStorage, refreshStorage, getNoteById } from './lib/storage';
 import { initFlowStorage, refreshFlowStorage, getFlowById } from './lib/flowStorage';
 import { initializeTheme, applyTheme } from './lib/themeStorage';
+import { logger } from './utils/logger';
+
+// Lazy load heavy components
+const FlowPage = lazy(() => import('./components/FlowPage'));
 
 function App() {
   const [currentView, setCurrentView] = useState<'home' | 'editor' | 'flows' | 'flow' | 'notes' | 'notfound'>('home');
@@ -109,53 +113,53 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        console.log('App initialization started');
+        logger.log('App initialization started');
         
         // Initialize and apply theme first
         const theme = await initializeTheme();
         applyTheme(theme);
-        console.log('Theme initialized:', theme);
+        logger.log('Theme initialized:', theme);
         
         // Check if folder is configured FIRST (before trying to restore handle)
         // This ensures we don't show onboarding if folder was previously configured
         const folderConfigured = isFolderConfigured();
-        console.log('Folder configured check:', folderConfigured);
+        logger.log('Folder configured check:', folderConfigured);
         
         // First, restore directory handle from IndexedDB if configured
         await initializeDirectoryHandle();
         const handleAvailable = hasDirectoryAccess();
-        console.log('Directory handle initialization completed, handle available:', handleAvailable);
+        logger.log('Directory handle initialization completed, handle available:', handleAvailable);
         
         // Give a tiny delay to ensure handle is fully set
         await new Promise(resolve => setTimeout(resolve, 10));
         
         // Check if we have valid access (handle exists AND permission is granted)
         const hasValidAccess = handleAvailable ? await hasValidDirectoryAccess() : false;
-        console.log('Valid directory access check:', hasValidAccess);
+        logger.log('Valid directory access check:', hasValidAccess);
         
         // Initialize storage (will use file system or localStorage)
         // Storage will use file system if folder is configured (even if handle needs re-granting)
         await initStorage();
         await initFlowStorage();
-        console.log('Storage initialization completed');
+        logger.log('Storage initialization completed');
         
         // Only show onboarding if folder was never configured
         // If folder is configured but handle is missing, we'll let the user use the app
         // and they can re-grant permission when needed
         if (!folderConfigured) {
-          console.log('No folder configured, showing onboarding');
+          logger.log('No folder configured, showing onboarding');
           setShowOnboarding(true);
         } else {
-          console.log('Folder is configured, proceeding with app');
+          logger.log('Folder is configured, proceeding with app');
           // Check if we need to show permission restore banner
           // Show banner if folder is configured but we don't have valid access
           if (!hasValidAccess) {
-            console.log('Folder configured but no valid access, showing restore banner');
+            logger.log('Folder configured but no valid access, showing restore banner');
             setNeedsPermissionRestore(true);
           }
         }
       } catch (error) {
-        console.error('Error initializing app:', error);
+        logger.error('Error initializing app:', error);
       } finally {
         setIsInitializing(false);
       }
@@ -201,9 +205,9 @@ function App() {
   const handleRestorePermission = async () => {
     setIsRestoringPermission(true);
     try {
-      console.log('Attempting to restore directory access...');
+      logger.log('Attempting to restore directory access...');
       const success = await restoreDirectoryAccess();
-      console.log('Restore result:', success);
+      logger.log('Restore result:', success);
       if (success) {
         // Refresh storage to load from file system
         await refreshStorage();
@@ -214,10 +218,10 @@ function App() {
         window.dispatchEvent(new CustomEvent('storage-refresh'));
       } else {
         // User cancelled the folder selection
-        console.log('User cancelled folder selection');
+        logger.log('User cancelled folder selection');
       }
     } catch (error: any) {
-      console.error('Error restoring permission:', error);
+      logger.error('Error restoring permission:', error);
       // If there's an error, user can try again or go to settings
       // Don't show error message - just let them try again
     } finally {
@@ -273,7 +277,7 @@ function App() {
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-theme-bg-primary flex items-center justify-center">
-        <div className="text-theme-text-secondary">Loading...</div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import {
   hasDirectoryAccess,
   getDirectoryHandle
 } from './fileSystemStorage';
+import { logger } from '../utils/logger';
 
 export type Theme = 'default' | 'darker';
 
@@ -24,7 +25,7 @@ export function getTheme(): Theme {
       return stored;
     }
   } catch (error) {
-    console.error('Error reading theme from localStorage:', error);
+    logger.error('Error reading theme from localStorage:', error);
   }
   return 'default';
 }
@@ -36,7 +37,7 @@ export async function saveTheme(theme: Theme): Promise<void> {
   try {
     // Save to localStorage
     localStorage.setItem(THEME_KEY, theme);
-    console.log('Theme saved to localStorage:', theme);
+    logger.log('Theme saved to localStorage:', theme);
 
     // Save to file system if folder is configured
     const folderConfigured = isFolderConfigured();
@@ -46,7 +47,7 @@ export async function saveTheme(theme: Theme): Promise<void> {
       await saveThemeToFile(theme);
     }
   } catch (error) {
-    console.error('Error saving theme:', error);
+    logger.error('Error saving theme:', error);
     // Still save to localStorage even if file write fails
     localStorage.setItem(THEME_KEY, theme);
   }
@@ -76,12 +77,12 @@ export async function loadThemeFromFile(): Promise<Theme | null> {
 
     const data = JSON.parse(text);
     if (data && (data.theme === 'default' || data.theme === 'darker')) {
-      console.log('Theme loaded from file:', data.theme);
+      logger.log('Theme loaded from file:', data.theme);
       return data.theme;
     }
   } catch (error: any) {
     if (error.name !== 'NotFoundError') {
-      console.error('Error loading theme from file:', error);
+      logger.error('Error loading theme from file:', error);
     }
   }
   return null;
@@ -102,9 +103,9 @@ async function saveThemeToFile(theme: Theme): Promise<void> {
     const data = { theme };
     await writable.write(JSON.stringify(data, null, 2));
     await writable.close();
-    console.log('Theme saved to file:', theme);
+    logger.log('Theme saved to file:', theme);
   } catch (error) {
-    console.error('Error saving theme to file:', error);
+    logger.error('Error saving theme to file:', error);
     throw error;
   }
 }
@@ -126,7 +127,7 @@ export async function initializeTheme(): Promise<Theme> {
     // Fall back to localStorage
     return getTheme();
   } catch (error) {
-    console.error('Error initializing theme:', error);
+    logger.error('Error initializing theme:', error);
     return getTheme();
   }
 }
@@ -136,6 +137,6 @@ export async function initializeTheme(): Promise<Theme> {
  */
 export function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute('data-theme', theme);
-  console.log('Theme applied to document:', theme);
+  logger.log('Theme applied to document:', theme);
 }
 

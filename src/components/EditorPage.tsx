@@ -36,8 +36,10 @@ import SettingsDialog from './SettingsDialog';
 import AIPromptDialog from './AIPromptDialog';
 import AIComparisonDialog from './AIComparisonDialog';
 import NoteReferenceModal from './NoteReferenceModal';
-import JSZip from 'jszip';
 import { exportToPDF } from '../lib/pdfExport';
+import { logger } from '../utils/logger';
+import { exportNoteAsJSON, exportNoteAsMarkdown, exportNotesAsJSON, exportNotesAsMarkdown } from '../utils/export';
+import { useClickOutside } from '../hooks/useClickOutside';
 
 interface EditorPageProps {
   noteId: string | null;
@@ -122,7 +124,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
       const data = getFlows();
       setFlows((data || []).map((f) => ({ id: f.id, title: f.title })));
     } catch (error) {
-      console.error('Error loading flows:', error);
+      logger.error('Error loading flows:', error);
     }
   };
 
@@ -144,7 +146,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
       
       setNoteFlowInfo(flowsContainingNote);
     } catch (error) {
-      console.error('Error checking note in flow:', error);
+      logger.error('Error checking note in flow:', error);
       setNoteFlowInfo([]);
     }
   };
@@ -159,7 +161,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
         setFolder(data.folder && data.folder.trim() ? data.folder : 'Unfiled');
       }
     } catch (error) {
-      console.error('Error loading note:', error);
+      logger.error('Error loading note:', error);
     }
   };
 
@@ -307,7 +309,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
           }
         }
       } catch (e) {
-        console.error('Autosave error:', e);
+        logger.error('Autosave error:', e);
       } finally {
         setSaving(false);
       }
@@ -315,21 +317,11 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     return () => clearTimeout(t);
   }, [title, content, isEditMode, currentNoteId, folder]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-
+  useClickOutside(menuRef, () => {
     if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      setMenuOpen(false);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuOpen]);
+  });
 
   // Handle text selection for AI
   useEffect(() => {
@@ -433,16 +425,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     if (!currentNoteId) return;
     const note = getNoteById(currentNoteId);
     if (!note) return;
-
-    const blob = new Blob([JSON.stringify(note, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${note.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    exportNoteAsJSON(note);
     setMenuOpen(false);
   };
 
@@ -480,43 +463,14 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
 
   const handleExportAll = async () => {
     const notes = getNotes();
-    if (notes.length === 0) {
-      setToast({
-        isOpen: true,
-        message: 'No notes to export.',
-        type: 'error',
-      });
-      setMenuOpen(false);
-      return;
-    }
-
     try {
-      const zip = new JSZip();
-      
-      // Add each note as an individual JSON file
-      notes.forEach((note) => {
-        const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
-        // Use note ID to ensure uniqueness if titles are similar
-        const fileName = `${sanitizedName}_${note.id.slice(0, 8)}.json`;
-        zip.file(fileName, JSON.stringify(note, null, 2));
-      });
-
-      // Generate ZIP file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pinn-notes-export.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await exportNotesAsJSON(notes);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      const message = error instanceof Error ? error.message : 'Failed to create export file.';
       setToast({
         isOpen: true,
-        message: 'Failed to create export file.',
+        message,
         type: 'error',
       });
       setMenuOpen(false);
@@ -527,17 +481,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
     if (!currentNoteId) return;
     const note = getNoteById(currentNoteId);
     if (!note) return;
-
-    const markdown = `# ${note.title}\n\n${note.content}`;
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${note.title.replace(/[^a-z0-9]/gi, '_')}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    exportNoteAsMarkdown(note);
     setMenuOpen(false);
   };
 
@@ -556,7 +500,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
         type: 'success',
       });
     } catch (error) {
-      console.error('Error exporting PDF:', error);
+      logger.error('Error exporting PDF:', error);
       setToast({
         isOpen: true,
         message: 'Failed to export PDF. Please try again.',
@@ -567,44 +511,14 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
 
   const handleExportAllMarkdown = async () => {
     const notes = getNotes();
-    if (notes.length === 0) {
-      setToast({
-        isOpen: true,
-        message: 'No notes to export.',
-        type: 'error',
-      });
-      setMenuOpen(false);
-      return;
-    }
-
     try {
-      const zip = new JSZip();
-      
-      // Add each note as an individual Markdown file
-      notes.forEach((note) => {
-        const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
-        // Use note ID to ensure uniqueness if titles are similar
-        const fileName = `${sanitizedName}_${note.id.slice(0, 8)}.md`;
-        const markdown = `# ${note.title}\n\n${note.content}`;
-        zip.file(fileName, markdown);
-      });
-
-      // Generate ZIP file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pinn-notes-export.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await exportNotesAsMarkdown(notes);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      const message = error instanceof Error ? error.message : 'Failed to create export file.';
       setToast({
         isOpen: true,
-        message: 'Failed to create export file.',
+        message,
         type: 'error',
       });
       setMenuOpen(false);
@@ -670,7 +584,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
           });
           setMenuOpen(false);
         } catch (error) {
-          console.error('Error importing notes:', error);
+          logger.error('Error importing notes:', error);
           setToast({
             isOpen: true,
             message: 'Failed to import notes. Please ensure the file is a valid JSON file.',
@@ -1056,6 +970,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-theme-text-primary hover:bg-theme-bg-secondary rounded transition-colors"
                   title="AI Assistant"
+                  aria-label="AI Assistant"
                 >
                   <Sparkles className="w-4 h-4" />
                 </button>
@@ -1102,6 +1017,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
                     onClick={handleDeleteNote}
                     className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-theme-bg-secondary rounded transition-colors"
                     title="Delete note"
+                    aria-label="Delete note"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1115,51 +1031,51 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
 
           {isEditMode && editorMode === 'markdown' && (
             <div className="flex items-center gap-1 pb-6 border-b border-theme-border flex-wrap">
-              <button onClick={() => wrapSelection('**')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => wrapSelection('**')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Bold">
                 <Bold className="w-5 h-5" />
               </button>
-              <button onClick={() => wrapSelection('*')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => wrapSelection('*')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Italic">
                 <Italic className="w-5 h-5" />
               </button>
-              <button onClick={() => wrapSelection('~~')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => wrapSelection('~~')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Strikethrough">
                 <Strikethrough className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => insertAtCursor('\n\n---\n\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => insertAtCursor('\n\n---\n\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Insert horizontal rule">
                 <Minus className="w-5 h-5" />
               </button>
-              <button onClick={() => applyToSelectedLines('> ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => applyToSelectedLines('> ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Quote">
                 <Quote className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => applyToSelectedLines('- ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => applyToSelectedLines('- ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Unordered list">
                 <List className="w-5 h-5" />
               </button>
-              <button onClick={() => applyToSelectedLines('1. ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => applyToSelectedLines('1. ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Ordered list">
                 <ListOrdered className="w-5 h-5" />
               </button>
-              <button onClick={() => applyToSelectedLines('- [ ] ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => applyToSelectedLines('- [ ] ')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Checklist">
                 <CheckSquare className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => insertAtCursor(`\n\n| Column 1 | Column 2 | Column 3 |\n|---------:|:--------:|:---------|\n| value    | value    | value    |\n\n`)} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => insertAtCursor(`\n\n| Column 1 | Column 2 | Column 3 |\n|---------:|:--------:|:---------|\n| value    | value    | value    |\n\n`)} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Insert table">
                 <Table className="w-5 h-5" />
               </button>
-              <button onClick={() => insertAtCursor('![alt text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors">
+              <button onClick={() => insertAtCursor('![alt text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" aria-label="Insert image">
                 <Image className="w-5 h-5" />
               </button>
-              <button onClick={() => insertAtCursor('[link text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Insert Link">
+              <button onClick={() => insertAtCursor('[link text](https://)')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Insert Link" aria-label="Insert link">
                 <Link className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => wrapSelection('`')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Inline Code">
+              <button onClick={() => wrapSelection('`')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Inline Code" aria-label="Inline code">
                 <Code className="w-5 h-5" />
               </button>
-              <button onClick={() => wrapSelection('\n```\n', '\n```\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Code Block">
+              <button onClick={() => wrapSelection('\n```\n', '\n```\n')} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Code Block" aria-label="Code block">
                 <Code2 className="w-5 h-5" />
               </button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
-              <button onClick={() => setShowNoteReferenceModal(true)} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Reference Note">
+              <button onClick={() => setShowNoteReferenceModal(true)} className="p-2 text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded transition-colors" title="Reference Note" aria-label="Reference note">
                 <Book className="w-5 h-5" />
               </button>
             </div>
@@ -1209,6 +1125,7 @@ export default function EditorPage({ noteId, onNavigateToHome, onNavigateToFlows
                   setNewFlowName('');
                 }}
                 className="text-theme-text-secondary hover:text-white hover:bg-theme-bg-secondary rounded-lg p-1.5 transition-colors"
+                aria-label="Close flow modal"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -6,7 +6,11 @@ import ConfirmDialog from './ConfirmDialog';
 import Toast from './Toast';
 import SettingsDialog from './SettingsDialog';
 import GraphViewDialog from './GraphViewDialog';
-import JSZip from 'jszip';
+import { logger } from '../utils/logger';
+import { exportNotesAsJSON, exportNotesAsMarkdown } from '../utils/export';
+import { useClickOutside } from '../hooks/useClickOutside';
+import { useDebounce } from '../hooks/useDebounce';
+import LoadingSpinner from './shared/LoadingSpinner';
 
 interface HomePageProps {
   onNavigateToEditor: (noteId?: string) => void;
@@ -52,33 +56,25 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
     };
   }, []);
 
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
   useEffect(() => {
     filterAndSortNotes();
     filterAndSortFlows();
-  }, [notes, flows, searchQuery, sortBy, flowSortBy]);
+  }, [notes, flows, debouncedSearchQuery, sortBy, flowSortBy]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-
+  useClickOutside(menuRef, () => {
     if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      setMenuOpen(false);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuOpen]);
+  });
 
   const loadNotes = () => {
     try {
       const data = loadFromStorage();
       setNotes(data || []);
     } catch (error) {
-      console.error('Error loading notes:', error);
+      logger.error('Error loading notes:', error);
     } finally {
       setLoading(false);
     }
@@ -89,15 +85,15 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
       const data = getFlows();
       setFlows(data || []);
     } catch (error) {
-      console.error('Error loading flows:', error);
+      logger.error('Error loading flows:', error);
     }
   };
 
   const filterAndSortNotes = () => {
     let filtered = notes;
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = notes.filter(
         (note) =>
           note.title.toLowerCase().includes(query) ||
@@ -118,8 +114,8 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
   const filterAndSortFlows = () => {
     let filtered = flows;
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = flows.filter(
         (flow) =>
           flow.title.toLowerCase().includes(query) ||
@@ -156,43 +152,14 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
 
   const handleExportAll = async () => {
     const allNotes = loadFromStorage();
-    if (allNotes.length === 0) {
-      setToast({
-        isOpen: true,
-        message: 'No notes to export.',
-        type: 'error',
-      });
-      setMenuOpen(false);
-      return;
-    }
-
     try {
-      const zip = new JSZip();
-      
-      // Add each note as an individual JSON file
-      allNotes.forEach((note) => {
-        const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
-        // Use note ID to ensure uniqueness if titles are similar
-        const fileName = `${sanitizedName}_${note.id.slice(0, 8)}.json`;
-        zip.file(fileName, JSON.stringify(note, null, 2));
-      });
-
-      // Generate ZIP file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pinn-notes-export.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await exportNotesAsJSON(allNotes);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      const message = error instanceof Error ? error.message : 'Failed to create export file.';
       setToast({
         isOpen: true,
-        message: 'Failed to create export file.',
+        message,
         type: 'error',
       });
       setMenuOpen(false);
@@ -201,44 +168,14 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
 
   const handleExportAllMarkdown = async () => {
     const allNotes = loadFromStorage();
-    if (allNotes.length === 0) {
-      setToast({
-        isOpen: true,
-        message: 'No notes to export.',
-        type: 'error',
-      });
-      setMenuOpen(false);
-      return;
-    }
-
     try {
-      const zip = new JSZip();
-      
-      // Add each note as an individual Markdown file
-      allNotes.forEach((note) => {
-        const sanitizedName = note.title.replace(/[^a-z0-9]/gi, '_') || 'Untitled';
-        // Use note ID to ensure uniqueness if titles are similar
-        const fileName = `${sanitizedName}_${note.id.slice(0, 8)}.md`;
-        const markdown = `# ${note.title}\n\n${note.content}`;
-        zip.file(fileName, markdown);
-      });
-
-      // Generate ZIP file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pinn-notes-export.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await exportNotesAsMarkdown(allNotes);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Error creating ZIP file:', error);
+      const message = error instanceof Error ? error.message : 'Failed to create export file.';
       setToast({
         isOpen: true,
-        message: 'Failed to create export file.',
+        message,
         type: 'error',
       });
       setMenuOpen(false);
@@ -300,7 +237,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
           });
           setMenuOpen(false);
         } catch (error) {
-          console.error('Error importing notes:', error);
+          logger.error('Error importing notes:', error);
           setToast({
             isOpen: true,
             message: 'Failed to import notes. Please ensure the file is a valid JSON file.',
@@ -431,7 +368,9 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-500 py-12">Loading...</div>
+          <div className="text-center py-12">
+            <LoadingSpinner size="lg" />
+          </div>
         ) : (
           <div className="space-y-16">
             {/* Flows Section */}
@@ -557,7 +496,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
               </div>
             )}
 
-            {searchQuery && filteredNotes.length === 0 && filteredFlows.length === 0 && (
+            {debouncedSearchQuery && filteredNotes.length === 0 && filteredFlows.length === 0 && (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-theme-bg-secondary border border-gray-600 mb-4">
                   <Search className="w-10 h-10 text-gray-500" />
@@ -575,6 +514,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
         onClick={() => setShowGraphView(true)}
         className="fixed bottom-24 right-8 w-14 h-14 bg-[#e8935f] hover:bg-[#d8834f] rounded-full flex items-center justify-center shadow-lg transition-colors z-40"
         title="Graph View"
+        aria-label="Open graph view"
       >
         <Network className="w-6 h-6 text-white" />
       </button>
@@ -583,6 +523,7 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
       <button
         onClick={handleNewNote}
         className="fixed bottom-8 right-8 w-14 h-14 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-40"
+        aria-label="Create new note"
       >
         <Plus className="w-6 h-6 text-white" />
       </button>
@@ -608,11 +549,15 @@ export default function HomePage({ onNavigateToEditor, onNavigateToFlows, onNavi
         onClose={() => setShowSettingsDialog(false)}
       />
 
-      <GraphViewDialog
-        isOpen={showGraphView}
-        onClose={() => setShowGraphView(false)}
-        onNavigateToNote={onNavigateToEditor}
-      />
+      {showGraphView && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50"><LoadingSpinner size="lg" /></div>}>
+          <GraphViewDialog
+            isOpen={showGraphView}
+            onClose={() => setShowGraphView(false)}
+            onNavigateToNote={onNavigateToEditor}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

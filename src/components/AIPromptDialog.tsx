@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Loader2, Send } from 'lucide-react';
 import { getGeminiApiKey } from '../lib/geminiStorage';
+import { logger } from '../utils/logger';
 
 interface AIPromptDialogProps {
   isOpen: boolean;
@@ -173,7 +174,7 @@ export default function AIPromptDialog({
 
       onClose();
     } catch (err) {
-      console.error('Error generating content:', err);
+      logger.error('Error generating content:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate content. Please check your API key and try again.';
       setError(errorMessage);
     } finally {

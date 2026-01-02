@@ -3,6 +3,9 @@ import { Search, Plus, Menu as MenuIcon, Download, Trash2, ChevronLeft, Book, Se
 import { getFlows, Flow, deleteFlow, getAllCategories, setFlowCategory, addCategory, renameCategory as storageRenameCategory, deleteCategory as storageDeleteCategory } from '../lib/flowStorage';
 import ConfirmDialog from './ConfirmDialog';
 import SettingsDialog from './SettingsDialog';
+import { logger } from '../utils/logger';
+import { useClickOutside } from '../hooks/useClickOutside';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface FlowsPageProps {
   onNavigateToFlow: (flowId?: string) => void;
@@ -35,38 +38,30 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
 
   useEffect(() => {
     loadFlows();
-    
+
     // Listen for storage refresh events (e.g., after folder restore)
     const handleStorageRefresh = () => {
       loadFlows();
     };
-    
+
     window.addEventListener('storage-refresh', handleStorageRefresh);
-    
+
     return () => {
       window.removeEventListener('storage-refresh', handleStorageRefresh);
     };
   }, []);
 
+  const debouncedSearchQuery = useDebounce(searchQuery);
+
   useEffect(() => {
     filterAndSortFlows();
-  }, [flows, searchQuery, sortBy, selectedCategory]);
+  }, [flows, debouncedSearchQuery, sortBy, selectedCategory]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-
+  useClickOutside(menuRef, () => {
     if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      setMenuOpen(false);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuOpen]);
+  });
 
   const loadFlows = () => {
     try {
@@ -79,7 +74,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
         setExpandedCategories(new Set(allCategories));
       }
     } catch (error) {
-      console.error('Error loading flows:', error);
+      logger.error('Error loading flows:', error);
     } finally {
       setLoading(false);
     }
@@ -119,12 +114,12 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
 
     // Sort flows within each category by updated_at
     Object.keys(organized).forEach((category) => {
-      organized[category].sort((a, b) => 
+      organized[category].sort((a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
     });
 
-    unfiled.sort((a, b) => 
+    unfiled.sort((a, b) =>
       new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
 
@@ -134,8 +129,8 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
   const filterAndSortFlows = () => {
     let filtered = flows;
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = flows.filter(
         (flow) =>
           flow.title.toLowerCase().includes(query) ||
@@ -384,7 +379,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Sidebar */}
-        <aside 
+        <aside
           className="bg-theme-bg-primary border-r border-theme-border w-[280px] min-w-[200px] flex-shrink-0 h-full flex flex-col"
         >
           {/* Fixed Header Section */}
@@ -405,11 +400,10 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
             <div className="mb-2">
               <button
                 onClick={() => handleCategoryClick('All')}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedCategory === 'All'
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === 'All'
                     ? 'bg-theme-bg-secondary text-theme-text-primary'
                     : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
-                }`}
+                  }`}
               >
                 <GitBranch className="w-4 h-4" />
                 <span className="flex-1 text-left">All Flows</span>
@@ -422,11 +416,10 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
               <div className="mb-2">
                 <button
                   onClick={() => handleCategoryClick('Unfiled')}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedCategory === 'Unfiled'
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === 'Unfiled'
                       ? 'bg-theme-bg-secondary text-white'
                       : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
-                  }`}
+                    }`}
                 >
                   <GitBranch className="w-4 h-4" />
                   <span className="flex-1 text-left">Unfiled</span>
@@ -442,6 +435,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                 onClick={handleCreateCategory}
                 className="text-xs text-gray-500 hover:text-theme-text-primary p-1"
                 title="New Category"
+                aria-label="Create new category"
               >
                 <Plus className="w-3 h-3" />
               </button>
@@ -449,9 +443,9 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
           </div>
 
           {/* Scrollable Categories List */}
-          <div 
+          <div
             className="flex-1 overflow-y-auto sidebar-scroll-container px-4 pb-4"
-            style={{ 
+            style={{
               scrollbarWidth: 'none', /* Firefox */
               msOverflowStyle: 'none', /* IE and Edge */
             }}
@@ -470,40 +464,39 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                 </div>
               )}
               {sortedCategories.map((categoryName) => {
-                  const categoryFlows = organized[categoryName] || [];
-                  const isExpanded = expandedCategories.has(categoryName);
-                  const filteredCategoryFlows = searchQuery
-                    ? categoryFlows.filter(
-                        (flow) =>
-                          flow.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          flow.tags?.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          flow.nodes?.some((node) => node.data.label.toLowerCase().includes(searchQuery.toLowerCase()))
-                      )
-                    : categoryFlows;
+                const categoryFlows = organized[categoryName] || [];
+                const isExpanded = expandedCategories.has(categoryName);
+                const filteredCategoryFlows = debouncedSearchQuery
+                  ? categoryFlows.filter(
+                    (flow) =>
+                      flow.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                      flow.tags?.some((tag) => tag.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
+                      flow.nodes?.some((node) => node.data.label.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))
+                  )
+                  : categoryFlows;
 
-                  return (
-                    <div key={categoryName} className="mb-1">
-                      <div className="flex items-center gap-2">
+                return (
+                  <div key={categoryName} className="mb-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleCategory(categoryName)}
+                        className="p-1 text-gray-500 hover:text-theme-text-primary transition-colors"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
+                      <div className={`group flex-1 flex items-center gap-2 px-1 rounded-lg text-sm min-w-0`}>
                         <button
-                          onClick={() => toggleCategory(categoryName)}
-                          className="p-1 text-gray-500 hover:text-theme-text-primary transition-colors"
-                          title={isExpanded ? 'Collapse' : 'Expand'}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                        </button>
-                        <div className={`group flex-1 flex items-center gap-2 px-1 rounded-lg text-sm min-w-0`}>
-                          <button
-                            onClick={() => handleCategoryClick(categoryName)}
-                            className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg transition-colors min-w-0 ${
-                              selectedCategory === categoryName
-                                ? 'bg-theme-bg-secondary text-white'
-                                : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
+                          onClick={() => handleCategoryClick(categoryName)}
+                          className={`flex-1 flex items-center gap-2 px-2 py-2 rounded-lg transition-colors min-w-0 ${selectedCategory === categoryName
+                              ? 'bg-theme-bg-secondary text-white'
+                              : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
                             }`}
-                          >
+                        >
                           {isExpanded ? (
                             <FolderOpen className="w-4 h-4 flex-shrink-0" />
                           ) : (
@@ -512,61 +505,66 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                           <span className="flex-1 text-left truncate">
                             {categoryName}
                           </span>
+                        </button>
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-2">
+                          <button
+                            title="Rename category"
+                            onClick={() => handleRenameCategory(categoryName)}
+                            className="p-1 text-gray-500 hover:text-theme-text-primary rounded"
+                            aria-label="Rename category"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 pr-2">
-                            <button
-                              title="Rename category"
-                              onClick={() => handleRenameCategory(categoryName)}
-                              className="p-1 text-gray-500 hover:text-theme-text-primary rounded"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              title="Delete category"
-                              onClick={() => handleDeleteCategoryClick(categoryName)}
-                              className="p-1 text-gray-500 hover:text-red-400 rounded"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          <button
+                            title="Delete category"
+                            onClick={() => handleDeleteCategoryClick(categoryName)}
+                            className="p-1 text-gray-500 hover:text-red-400 rounded"
+                            aria-label="Delete category"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                      {isExpanded && filteredCategoryFlows.length > 0 && (
-                        <div className="ml-7 mt-1 space-y-0.5">
-                          {filteredCategoryFlows.map((flow) => (
-                            <div key={flow.id} className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary transition-colors truncate min-w-0">
-                              <GitBranch className="w-3 h-3 flex-shrink-0" />
-                              <button
-                                onClick={() => onNavigateToFlow(flow.id)}
-                                className="flex-1 text-left truncate"
-                                title={flow.title}
-                              >
-                                {flow.title}
-                              </button>
-                              <button
-                                title="Edit flow"
-                                onClick={() => onNavigateToFlow(flow.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-theme-text-primary rounded"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </button>
-                              <button
-                                title="Delete flow"
-                                onClick={() => {
-                                  setFlowToDelete(flow.id);
-                                  setShowDeleteConfirm(true);
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
+                    {isExpanded && filteredCategoryFlows.length > 0 && (
+                      <div className="ml-7 mt-1 space-y-0.5">
+                        {filteredCategoryFlows.map((flow) => (
+                          <div key={flow.id} className="group flex items-center gap-2 px-3 py-1.5 rounded text-sm text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary transition-colors truncate min-w-0">
+                            <GitBranch className="w-3 h-3 flex-shrink-0" />
+                            <button
+                              onClick={() => onNavigateToFlow(flow.id)}
+                              className="flex-1 text-left truncate"
+                              title={flow.title}
+                            >
+                              {flow.title}
+                            </button>
+                            <button
+                              title="Edit flow"
+                              onClick={() => onNavigateToFlow(flow.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-theme-text-primary rounded"
+                              aria-label="Edit flow"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              title="Delete flow"
+                              onClick={() => {
+                                setFlowToDelete(flow.id);
+
+                                setShowDeleteConfirm(true);
+                              }}
+                              aria-label="Delete flow"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Empty state intentionally minimal - no extra call-to-action here */}
               {sortedCategories.length === 0 && unfiled.length === 0 && !loading && null}
@@ -598,9 +596,9 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
           </div>
 
           {/* Scrollable Flows List */}
-          <div 
+          <div
             className="flex-1 overflow-y-auto content-scroll-container"
-            style={{ 
+            style={{
               scrollbarWidth: 'none', /* Firefox */
               msOverflowStyle: 'none', /* IE and Edge */
             }}
@@ -662,6 +660,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                             onClick={(e) => handleDeleteFlow(flow.id, e)}
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-theme-bg-primary rounded transition-all"
                             title="Delete flow"
+                            aria-label="Delete flow"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -672,7 +671,7 @@ export default function FlowsPage({ onNavigateToFlow, onNavigateToHome, onNaviga
                 </div>
               ) : (
                 <div className="text-center text-gray-500 py-12">
-                  {searchQuery ? 'No flows found' : selectedCategory === 'All' ? 'No flows yet. Create your first flow!' : `No flows in "${selectedCategory}"`}
+                  {debouncedSearchQuery ? 'No flows found' : selectedCategory === 'All' ? 'No flows yet. Create your first flow!' : `No flows in "${selectedCategory}"`}
                 </div>
               )}
             </div>
