@@ -234,6 +234,12 @@ input[type="range"].slider::-moz-range-track {
   z-index: 10;
 }
 
+/* Remove focus outline for editor blocks to mimic Notion */
+.codex-editor__redactor [contenteditable]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .codex-editor__redactor {
   padding-bottom: 300px !important;
   margin-right: 0 !important;

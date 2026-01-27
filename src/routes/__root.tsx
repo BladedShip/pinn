@@ -9,6 +9,7 @@ import { initStorage, refreshStorage } from '../lib/storage';
 import { initFlowStorage, refreshFlowStorage } from '../lib/flowStorage';
 import { initializeTheme, applyTheme } from '../lib/themeStorage';
 import { logger } from '../utils/logger';
+import { AppLayout } from '../components/Layout/AppLayout';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -280,8 +281,10 @@ function RootComponent() {
           )}
 
           {/* Main Content - adjust padding if banner is visible */}
-          <div className={needsPermissionRestore ? 'pt-16' : ''}>
-            <Outlet />
+          <div className={needsPermissionRestore ? 'pt-16 h-full' : 'h-full'}>
+            <AppLayout>
+              <Outlet />
+            </AppLayout>
           </div>
         </>
       )}
