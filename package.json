@@ -15,6 +15,18 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@editorjs/checklist": "^1.6.0",
+    "@editorjs/code": "^2.9.4",
+    "@editorjs/delimiter": "^1.4.2",
+    "@editorjs/editorjs": "^2.31.1",
+    "@editorjs/header": "^2.8.8",
+    "@editorjs/image": "^2.10.3",
+    "@editorjs/inline-code": "^1.5.2",
+    "@editorjs/link": "^2.6.2",
+    "@editorjs/list": "^2.0.9",
+    "@editorjs/marker": "^1.4.0",
+    "@editorjs/quote": "^2.7.6",
+    "@editorjs/table": "^2.4.5",
     "@react-pdf/renderer": "^4.3.2",
     "@tanstack/react-router": "^1.144.0",
     "@xyflow/react": "^12.9.2",
