@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useRouter, useSearch } from '@tanstack/react-router';
 import { Search, Plus, Menu as MenuIcon, Download, Trash2, ChevronLeft, Book, Settings, Folder, FolderOpen, ChevronRight, ChevronDown, Edit2, GitBranch } from 'lucide-react';
-import { getFlows, Flow, deleteFlow, getAllCategories, setFlowCategory, addCategory, renameCategory as storageRenameCategory, deleteCategory as storageDeleteCategory } from '../lib/flowStorage';
+import { getFlows, Flow, deleteFlow, getAllCategories, setFlowCategory, addCategory, renameCategory as storageRenameCategory, deleteCategory as storageDeleteCategory, createFlow } from '../lib/flowStorage';
 import ConfirmDialog from './ConfirmDialog';
 import SettingsDialog from './SettingsDialog';
 import { logger } from '../utils/logger';
@@ -179,13 +179,14 @@ export default function FlowsPage() {
   }, [flows, debouncedSearchQuery, selectedCategory, sortBy]);
 
   const handleNewFlow = useCallback(() => {
-    // Store selected category for auto-assignment when flow is created
+    const newFlow = createFlow('Untitled Flow');
+
+    // Assign to selected category if active
     if (selectedCategory && selectedCategory !== 'All' && selectedCategory !== 'Unfiled') {
-      localStorage.setItem('pinn.pendingFlowCategory', selectedCategory);
-    } else {
-      localStorage.removeItem('pinn.pendingFlowCategory');
+      setFlowCategory(newFlow.id, selectedCategory);
     }
-    navigate({ to: '/flows' });
+
+    navigate({ to: '/flow/$flowId', params: { flowId: newFlow.id } });
   }, [selectedCategory, navigate]);
 
   const handleCreateCategory = () => {
@@ -313,7 +314,7 @@ export default function FlowsPage() {
   const sortedCategories = Array.from(categorySet).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="h-screen bg-theme-bg-primary flex flex-col overflow-hidden">
+    <div className="h-full bg-theme-bg-primary flex flex-col overflow-hidden">
       <header className="sticky top-0 z-50 bg-theme-bg-primary flex items-center justify-between px-6 py-4 border-b border-theme-border flex-shrink-0">
         <div className="flex items-center gap-4">
           <button

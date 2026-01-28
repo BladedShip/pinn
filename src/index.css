@@ -44,33 +44,33 @@ button::-moz-focus-inner {
 
 /* Theme CSS Variables */
 :root[data-theme="default"] {
-  --color-bg-primary: #2c3440;
-  --color-bg-secondary: #3a4450;
-  --color-bg-tertiary: #424d5a;
-  --color-bg-darker: #252b36;
-  --color-bg-darkest: #1f2833;
-  --color-border: #4a5560;
-  --color-border-light: rgba(74, 85, 96, 0.5);
-  --color-text-primary: #e5e7eb;
-  --color-text-secondary: #9ca3af;
-  --color-text-tertiary: #6b7280;
-  --color-accent: #6366F1;
-  --color-accent-hover: #5b5bf5;
+  --color-bg-primary: #09090b; /* Zinc 950 */
+  --color-bg-secondary: #18181b; /* Zinc 900 */
+  --color-bg-tertiary: #27272a; /* Zinc 800 */
+  --color-bg-darker: #0c0c0e; /* Slightly darker than 950 */
+  --color-bg-darkest: #000000;
+  --color-border: #27272a; /* Zinc 800 */
+  --color-border-light: rgba(63, 63, 70, 0.5);
+  --color-text-primary: #e4e4e7; /* Zinc 200 */
+  --color-text-secondary: #a1a1aa; /* Zinc 400 */
+  --color-text-tertiary: #71717a; /* Zinc 500 */
+  --color-accent: #3f3f46; /* Zinc 700 - Grey accent */
+  --color-accent-hover: #52525b; /* Zinc 600 */
 }
 
 :root[data-theme="darker"] {
-  --color-bg-primary: #0f1419;
-  --color-bg-secondary: #1a1f26;
-  --color-bg-tertiary: #252930;
-  --color-bg-darker: #0a0e13;
-  --color-bg-darkest: #050709;
-  --color-border: #2d3339;
-  --color-border-light: rgba(45, 51, 57, 0.5);
-  --color-text-primary: #e5e7eb;
-  --color-text-secondary: #9ca3af;
-  --color-text-tertiary: #6b7280;
-  --color-accent: #6366F1;
-  --color-accent-hover: #5b5bf5;
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #09090b;
+  --color-bg-tertiary: #18181b;
+  --color-bg-darker: #050505;
+  --color-bg-darkest: #000000;
+  --color-border: #27272a;
+  --color-border-light: rgba(39, 39, 42, 0.5);
+  --color-text-primary: #e4e4e7;
+  --color-text-secondary: #a1a1aa;
+  --color-text-tertiary: #71717a;
+  --color-accent: #3f3f46;
+  --color-accent-hover: #52525b;
 }
 
 /* React Flow dark theme styling */
@@ -381,42 +381,44 @@ h6.ce-header { font-size: 1em; line-height: 1.4; font-weight: 600; color: var(--
 }
 
 .ce-popover {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  border-radius: 8px;
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+  border-radius: 8px !important;
+  color: var(--color-text-primary) !important;
 }
 .ce-popover__item:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-popover__item-icon {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  box-shadow: none;
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: none !important;
 }
 
 .ce-inline-toolbar {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  z-index: 1000 !important;
 }
 .ce-inline-toolbar__dropdown:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-inline-tool:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-conversion-toolbar {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  z-index: 1000 !important;
 }
 .ce-conversion-tool:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-conversion-tool__icon {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 
 /* Placeholder color */

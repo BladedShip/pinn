@@ -799,9 +799,16 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Filters Section */}
                 <div>
-                  <button
+                  <div
                     onClick={() => toggleSection('filters')}
-                    className="w-full flex items-center justify-between py-2 text-theme-text-primary hover:text-white transition-colors"
+                    className="w-full flex items-center justify-between py-2 text-theme-text-primary hover:text-white transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        toggleSection('filters');
+                      }
+                    }}
                   >
                     <span className="font-medium">Filters</span>
                     <div className="flex items-center gap-2">
@@ -821,7 +828,7 @@ export default function GraphViewDialog({ isOpen, onClose, onNavigateToNote }: G
                         <ChevronRight className="w-4 h-4" />
                       )}
                     </div>
-                  </button>
+                  </div>
                   {expandedSections.filters && (
                     <div className="mt-3 space-y-3">
                       <div className="relative">

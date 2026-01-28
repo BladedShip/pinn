@@ -830,11 +830,69 @@ export async function writeNoteToFile(note: {
       }
     }
 
-    // Generate unique slug for the note
-    const baseSlug = createSlugFromTitle(note.title);
-    const isUntitled = !note.title || note.title.trim() === '' || note.title === 'Untitled';
-    const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs, isUntitled);
-    const filename = `${uniqueSlug}.md`;
+    // Check if we can reuse the existing filename
+    let filename: string;
+    if (existingNote && existingNote.folder === (note.folder || '')) {
+      // If title hasn't changed (or we are in the same folder and it matches), try to reuse
+      // We need to check if the current title still maps to the same slug or if we should force reuse
+      // to avoid minor slug variations causing new files.
+      // BUT, if the user explicitly changed the title, we usually want the filename to update.
+      // However, if the slug generation is unstable or collides, we might want to stick to the old name.
+
+      const oldPathParts = existingNote.filePath.split('/');
+      const oldFilename = oldPathParts[oldPathParts.length - 1];
+      const oldSlug = oldFilename.replace(/\.md$/, '');
+
+      const newBaseSlug = createSlugFromTitle(note.title);
+
+      // If the slug generated from the current title matches the old slug (ignoring uniqueness suffixes potentially),
+      // or if we just want to be safe: check if the old filename still exists.
+
+      // Ideally: If the title generates a DIFFERENT base slug, we rename.
+      // If it generates the SAME base slug, we keep the old filename (even if it has a suffix like -1).
+
+      // Let's check if the new title would generate a slug that "starts with" the old slug's base,
+      // OR if we just want to reuse the filename if the title is effectively the same.
+
+      // Simplest robust fix: If the note ID matches and we are in the same folder,
+      // and the title generates a slug that matches the file's current slug (stripping potential uniqueness suffix?),
+      // OR just strictly: if the title generates the SAME slug as before, reuse.
+
+      // Better yet: If we are saving the *same note*, and the title hasn't changed enough to warrant a new slug, reuse.
+      // Actually, if we just use the existing filename, we avoid the "create new file" issue entirely for content updates.
+      // We only want to rename if the title CHANGED.
+
+      if (existingNote.title === note.title) {
+        // Title didn't change, reuse exact filename
+        filename = oldFilename;
+      } else {
+        // Title changed, generate new slug
+        const baseSlug = createSlugFromTitle(note.title);
+        const isUntitled = !note.title || note.title.trim() === '' || note.title === 'Untitled';
+        // We must remove the OLD slug from existingSlugs before generating the new one to avoid self-collision if we were to rename to same thing (unlikely if title changed)
+        // But existingSlugs came from directory scan.
+        existingSlugs.delete(oldSlug);
+
+        const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs, isUntitled);
+        filename = `${uniqueSlug}.md`;
+
+        // Delete old file since we are renaming
+        try {
+          await folderDir.removeEntry(oldFilename, { recursive: false });
+          logger.log(`Renaming note: deleted old file ${oldFilename}`);
+        } catch (error: any) {
+          if (error.name !== 'NotFoundError') {
+            logger.warn(`Could not delete old note file during rename: ${error.message}`);
+          }
+        }
+      }
+    } else {
+      // New note or moving folders
+      const baseSlug = createSlugFromTitle(note.title);
+      const isUntitled = !note.title || note.title.trim() === '' || note.title === 'Untitled';
+      const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs, isUntitled);
+      filename = `${uniqueSlug}.md`;
+    }
 
     // Determine file path relative to notes directory
     const folderPath = note.folder ? normalizeFolderPath(note.folder) : '';

@@ -11,7 +11,8 @@ import {
   FolderOpen,
   Upload,
   Download,
-  MoreHorizontal
+  MoreHorizontal,
+  Network
 } from 'lucide-react';
 import { getNotes, deleteNote, getAllFolders, createNote } from '../lib/storage';
 import { useRef } from 'react';
@@ -23,6 +24,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Toggle } from './ui/toggle';
 import ConfirmDialog from './ConfirmDialog'; // Legacy dialog, keep for now or migrate later if needed
+import GraphViewDialog from './GraphViewDialog';
 import { ScrollArea } from './ui/scroll-area';
 
 export default function NotesPage() {
@@ -31,6 +33,7 @@ export default function NotesPage() {
   
   const [notes, setNotes] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showGraphView, setShowGraphView] = useState(false);
   const [searchQuery, setSearchQuery] = useState((search as { search?: string })?.search || '');
   const [sortBy] = useState<'title' | 'date'>((search as { sort?: 'title' | 'date' })?.sort || 'date');
   const [selectedFolder, setSelectedFolder] = useState<string>((search as { folder?: string })?.folder || 'All');
@@ -232,11 +235,20 @@ export default function NotesPage() {
             <Toggle
               pressed={viewMode === 'list'}
               onPressedChange={() => setViewMode('list')}
-              className="rounded-l-none"
+              className="rounded-l-none border-r"
               aria-label="List view"
             >
               <ListIcon className="h-4 w-4" />
             </Toggle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowGraphView(true)}
+              className="rounded-l-none"
+              title="Graph View"
+            >
+              <Network className="h-4 w-4" />
+            </Button>
           </div>
 
           <DropdownMenu>
@@ -364,6 +376,12 @@ export default function NotesPage() {
         title="Delete Note"
         message="Are you sure you want to delete this note? This cannot be undone."
         confirmText="Delete"
+      />
+
+      <GraphViewDialog
+        isOpen={showGraphView}
+        onClose={() => setShowGraphView(false)}
+        onNavigateToNote={(noteId) => navigate({ to: '/note/$noteId', params: { noteId } })}
       />
     </div>
   );
