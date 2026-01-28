@@ -381,42 +381,44 @@ h6.ce-header { font-size: 1em; line-height: 1.4; font-weight: 600; color: var(--
 }
 
 .ce-popover {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  border-radius: 8px;
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+  border-radius: 8px !important;
+  color: var(--color-text-primary) !important;
 }
 .ce-popover__item:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-popover__item-icon {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  box-shadow: none;
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: none !important;
 }
 
 .ce-inline-toolbar {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  z-index: 1000 !important;
 }
 .ce-inline-toolbar__dropdown:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-inline-tool:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-conversion-toolbar {
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  z-index: 1000 !important;
 }
 .ce-conversion-tool:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 .ce-conversion-tool__icon {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary) !important;
 }
 
 /* Placeholder color */
