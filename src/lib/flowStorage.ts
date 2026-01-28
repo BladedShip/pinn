@@ -508,8 +508,11 @@ export function deleteCategory(
     
     // Move category and flows to trash
     if (isFolderConfigured() && hasDirectoryAccess()) {
-      const { moveCategoryToTrash } = require('./trashStorage');
-      moveCategoryToTrash(target, flowsInCategory).catch(logger.error);
+      import('./trashStorage')
+        .then(({ moveCategoryToTrash }) => {
+          moveCategoryToTrash(target, flowsInCategory).catch(logger.error);
+        })
+        .catch(logger.error);
     }
     
     next = all.filter((f) => {

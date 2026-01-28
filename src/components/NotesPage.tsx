@@ -8,9 +8,13 @@ import {
   List as ListIcon,
   MoreVertical,
   Calendar,
-  FolderOpen
+  FolderOpen,
+  Upload,
+  Download,
+  MoreHorizontal
 } from 'lucide-react';
-import { getNotes, deleteNote, getAllFolders } from '../lib/storage';
+import { getNotes, deleteNote, getAllFolders, createNote } from '../lib/storage';
+import { useRef } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatDate } from '../utils/date';
 import { Button } from './ui/button';
@@ -34,6 +38,7 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadNotes = () => {
     try {
@@ -99,8 +104,85 @@ export default function NotesPage() {
     }
   };
 
+  const handleImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    let importedCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const text = await file.text();
+        if (file.type === 'application/json' || file.name.endsWith('.json')) {
+           try {
+             const jsonData = JSON.parse(text);
+             if (Array.isArray(jsonData)) {
+               // Bulk import
+               jsonData.forEach(note => {
+                 if (note.title || note.content) {
+                   createNote(note.title || 'Untitled', note.content || '');
+                   importedCount++;
+                 }
+               });
+             } else if (jsonData.title || jsonData.content) {
+               // Single note import
+               createNote(jsonData.title || 'Untitled', jsonData.content || '');
+               importedCount++;
+             }
+           } catch (e) {
+             console.error('Invalid JSON file', e);
+           }
+        } else {
+          // Assume markdown/text
+          const title = file.name.replace(/\.[^/.]+$/, "");
+          createNote(title, text);
+          importedCount++;
+        }
+      } catch (error) {
+        console.error('Error reading file:', error);
+      }
+    }
+
+    if (importedCount > 0) {
+      loadNotes();
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleExportAll = () => {
+    const allNotes = getNotes();
+    const blob = new Blob([JSON.stringify(allNotes, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pinn-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="h-full flex flex-col p-6 space-y-6">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        multiple
+        accept=".json,.md,.txt"
+      />
       {/* Header / Toolbar */}
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -156,6 +238,22 @@ export default function NotesPage() {
               <ListIcon className="h-4 w-4" />
             </Toggle>
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleImportClick}>
+                <Upload className="mr-2 h-4 w-4" /> Import Notes
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportAll}>
+                <Download className="mr-2 h-4 w-4" /> Export All
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button onClick={() => navigate({ to: '/note/new' })}>
             <Plus className="mr-2 h-4 w-4" /> New Note
