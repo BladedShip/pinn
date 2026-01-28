@@ -836,6 +836,24 @@ export async function writeNoteToFile(note: {
     const uniqueSlug = generateUniqueSlug(baseSlug, existingSlugs, isUntitled);
     const filename = `${uniqueSlug}.md`;
 
+    // Handle renaming within the same folder
+    if (existingNote && existingNote.folder === (note.folder || '')) {
+      const oldPathParts = existingNote.filePath.split('/');
+      const oldFilename = oldPathParts[oldPathParts.length - 1];
+
+      // If filename changed (due to title change), delete the old file
+      if (filename !== oldFilename) {
+        try {
+          await folderDir.removeEntry(oldFilename, { recursive: false });
+          logger.log(`Renaming note: deleted old file ${oldFilename}`);
+        } catch (error: any) {
+          if (error.name !== 'NotFoundError') {
+            logger.warn(`Could not delete old note file during rename: ${error.message}`);
+          }
+        }
+      }
+    }
+
     // Determine file path relative to notes directory
     const folderPath = note.folder ? normalizeFolderPath(note.folder) : '';
     const filePath = folderPath ? `${folderPath}/${filename}` : `unfiled/${filename}`;
