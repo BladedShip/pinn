@@ -2,7 +2,7 @@
 // Usage: node server.js
 // This ensures all routes serve index.html for proper SPA routing
 
-import { createServer } from 'http';
+import { createServer } from 'https';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
@@ -57,3 +57,4 @@ server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}/`);
   console.log('Serving files from:', distDir);
 });
+
