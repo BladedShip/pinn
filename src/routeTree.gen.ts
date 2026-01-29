@@ -8,131 +8,144 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root';
-import { Route as TrashRouteImport } from './routes/trash';
-import { Route as NotesRouteImport } from './routes/notes';
-import { Route as FlowsRouteImport } from './routes/flows';
-import { Route as IndexRouteImport } from './routes/index';
-import { Route as NoteNoteIdRouteImport } from './routes/note.$noteId';
-import { Route as FlowFlowIdRouteImport } from './routes/flow.$flowId';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrashRouteImport } from './routes/trash'
+import { Route as NotesRouteImport } from './routes/notes'
+import { Route as FlowsRouteImport } from './routes/flows'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as NoteNoteIdRouteImport } from './routes/note.$noteId'
+import { Route as FlowFlowIdRouteImport } from './routes/flow.$flowId'
 
 const TrashRoute = TrashRouteImport.update({
   id: '/trash',
   path: '/trash',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const NotesRoute = NotesRouteImport.update({
   id: '/notes',
   path: '/notes',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const FlowsRoute = FlowsRouteImport.update({
   id: '/flows',
   path: '/flows',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const NoteNoteIdRoute = NoteNoteIdRouteImport.update({
   id: '/note/$noteId',
   path: '/note/$noteId',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const FlowFlowIdRoute = FlowFlowIdRouteImport.update({
   id: '/flow/$flowId',
   path: '/flow/$flowId',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute;
-  '/flows': typeof FlowsRoute;
-  '/notes': typeof NotesRoute;
-  '/trash': typeof TrashRoute;
-  '/flow/$flowId': typeof FlowFlowIdRoute;
-  '/note/$noteId': typeof NoteNoteIdRoute;
+  '/': typeof IndexRoute
+  '/flows': typeof FlowsRoute
+  '/notes': typeof NotesRoute
+  '/trash': typeof TrashRoute
+  '/flow/$flowId': typeof FlowFlowIdRoute
+  '/note/$noteId': typeof NoteNoteIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute;
-  '/flows': typeof FlowsRoute;
-  '/notes': typeof NotesRoute;
-  '/trash': typeof TrashRoute;
-  '/flow/$flowId': typeof FlowFlowIdRoute;
-  '/note/$noteId': typeof NoteNoteIdRoute;
+  '/': typeof IndexRoute
+  '/flows': typeof FlowsRoute
+  '/notes': typeof NotesRoute
+  '/trash': typeof TrashRoute
+  '/flow/$flowId': typeof FlowFlowIdRoute
+  '/note/$noteId': typeof NoteNoteIdRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/': typeof IndexRoute;
-  '/flows': typeof FlowsRoute;
-  '/notes': typeof NotesRoute;
-  '/trash': typeof TrashRoute;
-  '/flow/$flowId': typeof FlowFlowIdRoute;
-  '/note/$noteId': typeof NoteNoteIdRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/flows': typeof FlowsRoute
+  '/notes': typeof NotesRoute
+  '/trash': typeof TrashRoute
+  '/flow/$flowId': typeof FlowFlowIdRoute
+  '/note/$noteId': typeof NoteNoteIdRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/flows' | '/notes' | '/trash' | '/flow/$flowId' | '/note/$noteId';
-  fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/flows' | '/notes' | '/trash' | '/flow/$flowId' | '/note/$noteId';
-  id: '__root__' | '/' | '/flows' | '/notes' | '/trash' | '/flow/$flowId' | '/note/$noteId';
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/flows'
+    | '/notes'
+    | '/trash'
+    | '/flow/$flowId'
+    | '/note/$noteId'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/flows' | '/notes' | '/trash' | '/flow/$flowId' | '/note/$noteId'
+  id:
+    | '__root__'
+    | '/'
+    | '/flows'
+    | '/notes'
+    | '/trash'
+    | '/flow/$flowId'
+    | '/note/$noteId'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  FlowsRoute: typeof FlowsRoute;
-  NotesRoute: typeof NotesRoute;
-  TrashRoute: typeof TrashRoute;
-  FlowFlowIdRoute: typeof FlowFlowIdRoute;
-  NoteNoteIdRoute: typeof NoteNoteIdRoute;
+  IndexRoute: typeof IndexRoute
+  FlowsRoute: typeof FlowsRoute
+  NotesRoute: typeof NotesRoute
+  TrashRoute: typeof TrashRoute
+  FlowFlowIdRoute: typeof FlowFlowIdRoute
+  NoteNoteIdRoute: typeof NoteNoteIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/trash': {
-      id: '/trash';
-      path: '/trash';
-      fullPath: '/trash';
-      preLoaderRoute: typeof TrashRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/trash'
+      path: '/trash'
+      fullPath: '/trash'
+      preLoaderRoute: typeof TrashRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/notes': {
-      id: '/notes';
-      path: '/notes';
-      fullPath: '/notes';
-      preLoaderRoute: typeof NotesRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof NotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flows': {
-      id: '/flows';
-      path: '/flows';
-      fullPath: '/flows';
-      preLoaderRoute: typeof FlowsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/flows'
+      path: '/flows'
+      fullPath: '/flows'
+      preLoaderRoute: typeof FlowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
-      id: '/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/note/$noteId': {
-      id: '/note/$noteId';
-      path: '/note/$noteId';
-      fullPath: '/note/$noteId';
-      preLoaderRoute: typeof NoteNoteIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/note/$noteId'
+      path: '/note/$noteId'
+      fullPath: '/note/$noteId'
+      preLoaderRoute: typeof NoteNoteIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flow/$flowId': {
-      id: '/flow/$flowId';
-      path: '/flow/$flowId';
-      fullPath: '/flow/$flowId';
-      preLoaderRoute: typeof FlowFlowIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/flow/$flowId'
+      path: '/flow/$flowId'
+      fullPath: '/flow/$flowId'
+      preLoaderRoute: typeof FlowFlowIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -143,7 +156,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrashRoute: TrashRoute,
   FlowFlowIdRoute: FlowFlowIdRoute,
   NoteNoteIdRoute: NoteNoteIdRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()

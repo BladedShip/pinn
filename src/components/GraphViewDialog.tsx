@@ -15,6 +15,7 @@ import { Network as VisNetwork } from 'vis-network/standalone';
 // @ts-ignore
 import { DataSet } from 'vis-data/standalone';
 import { getNotes } from '../lib/storage';
+import { getFlows } from '../lib/flowStorage';
 
 interface GraphViewDialogProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ interface GraphLink {
   from: string;
   to: string;
   value?: number;
+  isFlowEdge?: boolean;
 }
 
 export default function GraphViewDialog({
@@ -51,6 +53,9 @@ export default function GraphViewDialog({
     edges: GraphLink[];
   }>({ nodes: [], edges: [] });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [savedPositions, setSavedPositions] = useState<Record<string, { x: number; y: number }>>(
+    {}
+  );
   const networkRef = useRef<VisNetwork | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<DataSet<any>>(new DataSet());
@@ -114,6 +119,18 @@ export default function GraphViewDialog({
     return matches ? matches.map(match => match.substring(1)) : [];
   };
 
+  // Load saved positions
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pinn.graphPositions');
+      if (saved) {
+        setSavedPositions(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to load graph positions', e);
+    }
+  }, [isOpen]);
+
   // Handle window resize
   useEffect(() => {
     if (!isOpen) return;
@@ -135,6 +152,7 @@ export default function GraphViewDialog({
     if (!isOpen) return;
 
     const notes = getNotes();
+    const flows = getFlows();
     const nodes: GraphNode[] = [];
     const edges: GraphLink[] = [];
     const nodeMap = new Map<string, GraphNode>();
@@ -219,6 +237,46 @@ export default function GraphViewDialog({
           from: noteNodeId,
           to: tagNodeId,
         });
+      });
+    });
+
+    // Add flow connections
+    const addedEdges = new Set<string>();
+    // Pre-populate with existing edges to avoid duplicates
+    edges.forEach(e => addedEdges.add(`${e.from}-${e.to}`));
+
+    flows.forEach(flow => {
+      const nodeToNoteMap = new Map<string, string>();
+      flow.nodes.forEach(node => {
+        nodeToNoteMap.set(node.id, node.noteId);
+      });
+
+      flow.edges.forEach(edge => {
+        const sourceNoteId = nodeToNoteMap.get(edge.source);
+        const targetNoteId = nodeToNoteMap.get(edge.target);
+
+        if (sourceNoteId && targetNoteId) {
+          const fromId = `note-${sourceNoteId}`;
+          const toId = `note-${targetNoteId}`;
+
+          // Check if nodes exist in graph (they should if notes exist)
+          if (nodeMap.has(fromId) && nodeMap.has(toId)) {
+            const edgeKey = `${fromId}-${toId}`;
+            // Flows are directed, but graph edges might be duplicated if we have multiple flows
+            // connecting the same notes. We'll allow it but maybe VisNetwork handles it.
+            // Let's add it if it's not exactly the same existing edge.
+            // Actually, for flow edges, let's allow duplicates if they are from different contexts,
+            // but simpler to avoid clutter.
+            if (!addedEdges.has(edgeKey)) {
+              edges.push({
+                from: fromId,
+                to: toId,
+                isFlowEdge: true,
+              });
+              addedEdges.add(edgeKey);
+            }
+          }
+        }
       });
     });
 
@@ -398,6 +456,9 @@ export default function GraphViewDialog({
         },
         labelHighlightBold: true,
         mass: node.type === 'folder' ? 2 : node.type === 'tag' ? 1.5 : 1, // Heavier nodes for better physics
+        x: savedPositions[node.id]?.x,
+        y: savedPositions[node.id]?.y,
+        physics: savedPositions[node.id] ? false : undefined, // Fix position if saved
       };
     });
 
@@ -423,7 +484,16 @@ export default function GraphViewDialog({
 
       // Determine edge color based on connected nodes
       let edgeColor = 'rgba(200, 200, 200, 0.4)';
-      if (sourceNode && targetNode) {
+      let dashes = false;
+      let width = 2.5;
+
+      if (edge.isFlowEdge) {
+        // Style for flow connections - faint, dotted
+        edgeColor = 'rgba(255, 255, 255, 0.15)'; // Very faint white
+        dashes = true;
+        width = 1.5;
+        length = length * 1.5; // Make them slightly longer to separate clusters
+      } else if (sourceNode && targetNode) {
         if (sourceNode.type === 'folder' || targetNode.type === 'folder') {
           edgeColor = 'rgba(20, 184, 166, 0.5)'; // Teal for folder connections
         } else if (sourceNode.type === 'tag' || targetNode.type === 'tag') {
@@ -437,11 +507,16 @@ export default function GraphViewDialog({
         from: edge.from,
         to: edge.to,
         length: length,
-        width: 2.5,
+        width: width,
+        dashes: dashes,
         color: {
           color: edgeColor,
-          highlight: edgeColor.replace('0.5', '0.9').replace('0.4', '0.9'),
-          hover: edgeColor.replace('0.5', '0.7').replace('0.4', '0.7'),
+          highlight: edge.isFlowEdge
+            ? 'rgba(255, 255, 255, 0.5)'
+            : edgeColor.replace('0.5', '0.9').replace('0.4', '0.9'),
+          hover: edge.isFlowEdge
+            ? 'rgba(255, 255, 255, 0.3)'
+            : edgeColor.replace('0.5', '0.7').replace('0.4', '0.7'),
         },
         smooth:
           edgeSmoothness > 0
@@ -462,7 +537,7 @@ export default function GraphViewDialog({
     });
 
     return { visNodes: nodes, visEdges: edges };
-  }, [filteredGraphData, nodeSize, nodeDistance, edgeSmoothness]);
+  }, [filteredGraphData, nodeSize, nodeDistance, edgeSmoothness, savedPositions]);
 
   // Memoize network options
   const networkOptions = useMemo(
@@ -495,6 +570,7 @@ export default function GraphViewDialog({
       },
       layout: {
         improvedLayout: true,
+        randomSeed: 42, // Deterministic layout
       },
       nodes: {
         borderWidth: 3,
@@ -598,13 +674,27 @@ export default function GraphViewDialog({
         }
       });
 
+      networkRef.current.on('dragEnd', () => {
+        if (networkRef.current) {
+          const positions = networkRef.current.getPositions();
+          setSavedPositions(prev => {
+            const next = { ...prev, ...positions };
+            localStorage.setItem('pinn.graphPositions', JSON.stringify(next));
+            return next;
+          });
+        }
+      });
+
       networkRef.current.on('stabilizationEnd' as any, () => {
-        networkRef.current?.fit({
-          animation: {
-            duration: 400,
-            easingFunction: 'easeInOutQuad',
-          },
-        });
+        // Only fit if we don't have saved positions
+        if (Object.keys(savedPositions).length === 0) {
+          networkRef.current?.fit({
+            animation: {
+              duration: 400,
+              easingFunction: 'easeInOutQuad',
+            },
+          });
+        }
       });
     } else {
       // Update existing network with new data (node sizes, edge lengths)
@@ -681,6 +771,10 @@ export default function GraphViewDialog({
     setAvoidOverlap(5.0);
     setEdgeSmoothness(0.5);
     setNodeSize({ folder: 20, note: 15, tag: 10 });
+    // Reset saved positions
+    localStorage.removeItem('pinn.graphPositions');
+    setSavedPositions({});
+
     if (networkRef.current) {
       networkRef.current.fit({
         animation: {
