@@ -90,6 +90,9 @@ async function initialize(): Promise<void> {
         }
 
         logger.log(`Initialized storage: ${notesCache.length} notes (from index)`);
+
+        // Trigger background hydration
+        hydrateAllNotes().catch(err => logger.error('Background hydration failed:', err));
       } else {
         logger.log(
           'Using localStorage fallback (folder configured:',
@@ -533,4 +536,48 @@ export async function deleteFolder(
 export function writeAll(notes: Note[]): void {
   notesCache = notes;
   writeAllAsync(notes).catch(logger.error);
+}
+
+/**
+ * Background hydration of all notes content
+ */
+async function hydrateAllNotes(): Promise<void> {
+  if (!isFolderConfigured() || !hasDirectoryAccess() || !notesCache) {
+    return;
+  }
+
+  logger.log('Starting background hydration of notes content...');
+  const notesToHydrate = notesCache.filter(n => !n.content);
+
+  if (notesToHydrate.length === 0) {
+    logger.log('All notes already hydrated');
+    return;
+  }
+
+  logger.log(`Hydrating ${notesToHydrate.length} notes...`);
+
+  // Process in small batches to avoid blocking UI
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < notesToHydrate.length; i += BATCH_SIZE) {
+    const batch = notesToHydrate.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async note => {
+        try {
+          const fullNote = await readNoteFromFile(note.id);
+          if (fullNote && notesCache) {
+            const index = notesCache.findIndex(n => n.id === note.id);
+            if (index >= 0) {
+              notesCache[index] = fullNote;
+            }
+          }
+        } catch (error) {
+          logger.error(`Error hydrating note ${note.id}:`, error);
+        }
+      })
+    );
+    // Small delay between batches
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  logger.log('Background hydration completed');
 }
