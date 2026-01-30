@@ -1,13 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
-import {
-  Book,
-  GitBranch,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-} from 'lucide-react';
+import { Book, GitBranch, Settings, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -39,14 +32,12 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
     <>
       <div
         className={cn(
-          "group relative flex flex-col border-r bg-card transition-all duration-300 ease-in-out",
-          collapsed ? "w-[60px]" : "w-[240px]"
+          'group relative flex flex-col border-r bg-card transition-all duration-300 ease-in-out',
+          collapsed ? 'w-[60px]' : 'w-[240px]'
         )}
       >
         <div className="flex h-14 items-center justify-between px-3 border-b">
-          {!collapsed && (
-            <span className="font-semibold text-lg px-2">Pinn</span>
-          )}
+          {!collapsed && <span className="font-semibold text-lg px-2">Pinn</span>}
           <Button
             variant="ghost"
             size="icon"
@@ -59,18 +50,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
 
         <ScrollArea className="flex-1 py-4">
           <div className="px-2 space-y-1">
-            {navItems.map((item) => (
+            {navItems.map(item => (
               <Button
                 key={item.path}
-                variant={isActive(item.path) ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start",
-                  collapsed ? "px-2" : "px-3"
-                )}
+                variant={isActive(item.path) ? 'secondary' : 'ghost'}
+                className={cn('w-full justify-start', collapsed ? 'px-2' : 'px-3')}
                 onClick={() => navigate({ to: item.path })}
                 title={collapsed ? item.label : undefined}
               >
-                <item.icon className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-2")} />
+                <item.icon className={cn('h-4 w-4', collapsed ? 'mr-0' : 'mr-2')} />
                 {!collapsed && <span>{item.label}</span>}
               </Button>
             ))}
@@ -79,41 +67,32 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
           <Separator className="my-4 mx-2" />
 
           <div className="px-2 space-y-1">
-             <Button
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start",
-                  collapsed ? "px-2" : "px-3"
-                )}
-                onClick={() => navigate({ to: '/note/new' })}
-                title={collapsed ? "New Note" : undefined}
-              >
-                <Plus className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-2")} />
-                {!collapsed && <span>New Note</span>}
-              </Button>
+            <Button
+              variant="ghost"
+              className={cn('w-full justify-start', collapsed ? 'px-2' : 'px-3')}
+              onClick={() => navigate({ to: '/note/new' })}
+              title={collapsed ? 'New Note' : undefined}
+            >
+              <Plus className={cn('h-4 w-4', collapsed ? 'mr-0' : 'mr-2')} />
+              {!collapsed && <span>New Note</span>}
+            </Button>
           </div>
         </ScrollArea>
 
         <div className="p-2 border-t mt-auto">
           <Button
             variant="ghost"
-            className={cn(
-              "w-full justify-start",
-              collapsed ? "px-2" : "px-3"
-            )}
+            className={cn('w-full justify-start', collapsed ? 'px-2' : 'px-3')}
             onClick={() => setShowSettings(true)}
-            title={collapsed ? "Settings" : undefined}
+            title={collapsed ? 'Settings' : undefined}
           >
-            <Settings className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-2")} />
+            <Settings className={cn('h-4 w-4', collapsed ? 'mr-0' : 'mr-2')} />
             {!collapsed && <span>Settings</span>}
           </Button>
         </div>
       </div>
 
-      <SettingsDialog
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
+      <SettingsDialog isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </>
   );
 }

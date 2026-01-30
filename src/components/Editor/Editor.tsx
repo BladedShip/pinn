@@ -25,7 +25,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ data, onChange, readOnly
       }
       return Promise.resolve(data);
     },
-    getInstance: () => editorRef.current
+    getInstance: () => editorRef.current,
   }));
 
   useEffect(() => {
@@ -65,7 +65,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ data, onChange, readOnly
 
   // Handle readOnly updates
   useEffect(() => {
-    if (editorRef.current && isReadyRef.current && typeof editorRef.current.readOnly !== 'undefined') {
+    if (
+      editorRef.current &&
+      isReadyRef.current &&
+      typeof editorRef.current.readOnly !== 'undefined'
+    ) {
       editorRef.current.readOnly.toggle(readOnly);
     }
   }, [readOnly]);

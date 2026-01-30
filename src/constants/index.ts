@@ -96,4 +96,3 @@ export const SEARCH_CONFIG = {
 // File Name Sanitization
 export const FILE_NAME_REGEX = /[^a-z0-9]/gi;
 export const FILE_NAME_REPLACEMENT = '_';
-

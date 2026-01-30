@@ -9,4 +9,3 @@ export interface ToastState {
 }
 
 export type EditorMode = 'markdown' | 'preview';
-

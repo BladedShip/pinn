@@ -29,13 +29,13 @@ export default function ConfirmDialog({
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-md border border-theme-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-theme-border">
           <div className="flex items-center justify-between">
@@ -56,7 +56,7 @@ export default function ConfirmDialog({
 
         <div className="px-6 py-6">
           <p className="text-theme-text-primary mb-6">{message}</p>
-          
+
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
@@ -76,4 +76,3 @@ export default function ConfirmDialog({
     </div>
   );
 }
-

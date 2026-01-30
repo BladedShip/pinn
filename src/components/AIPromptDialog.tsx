@@ -13,14 +13,14 @@ interface AIPromptDialogProps {
   onOpenSettings?: () => void;
 }
 
-export default function AIPromptDialog({ 
-  isOpen, 
-  onClose, 
+export default function AIPromptDialog({
+  isOpen,
+  onClose,
   onGenerate,
   selectedText,
   selectionStart,
   selectionEnd,
-  onOpenSettings
+  onOpenSettings,
 }: AIPromptDialogProps) {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -38,7 +38,11 @@ export default function AIPromptDialog({
     }
   }, [isOpen]);
 
-  const tryGenerateWithModel = async (apiKey: string, fullPrompt: string, modelName: string): Promise<string> => {
+  const tryGenerateWithModel = async (
+    apiKey: string,
+    fullPrompt: string,
+    modelName: string
+  ): Promise<string> => {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
       {
@@ -47,11 +51,15 @@ export default function AIPromptDialog({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: fullPrompt
-            }]
-          }]
+          contents: [
+            {
+              parts: [
+                {
+                  text: fullPrompt,
+                },
+              ],
+            },
+          ],
         }),
       }
     );
@@ -62,7 +70,7 @@ export default function AIPromptDialog({
     }
 
     const data = await response.json();
-    
+
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
       throw new Error('Invalid response from API');
     }
@@ -83,9 +91,9 @@ export default function AIPromptDialog({
       const data = await response.json();
       if (data.models && Array.isArray(data.models)) {
         return data.models
-          .filter((model: any) => 
-            model.name && 
-            model.supportedGenerationMethods?.includes('generateContent')
+          .filter(
+            (model: any) =>
+              model.name && model.supportedGenerationMethods?.includes('generateContent')
           )
           .map((model: any) => model.name.replace('models/', ''))
           .sort((a: string, b: string) => {
@@ -135,7 +143,7 @@ export default function AIPromptDialog({
 
       // First, try to list available models
       const availableModels = await listAvailableModels(apiKey);
-      
+
       // Fallback list of common model names to try
       const fallbackModels = [
         'gemini-2.0-flash-exp',
@@ -163,7 +171,10 @@ export default function AIPromptDialog({
       }
 
       if (!generatedText) {
-        throw lastError || new Error('No available models found. Please check your API key and try again.');
+        throw (
+          lastError ||
+          new Error('No available models found. Please check your API key and try again.')
+        );
       }
 
       if (hasSelection && selectionStart !== undefined && selectionEnd !== undefined) {
@@ -175,7 +186,10 @@ export default function AIPromptDialog({
       onClose();
     } catch (err) {
       logger.error('Error generating content:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate content. Please check your API key and try again.';
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Failed to generate content. Please check your API key and try again.';
       setError(errorMessage);
     } finally {
       setIsGenerating(false);
@@ -185,13 +199,13 @@ export default function AIPromptDialog({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-2xl border border-theme-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-theme-border">
           <div className="flex items-center justify-between">
@@ -214,27 +228,37 @@ export default function AIPromptDialog({
         <div className="px-6 py-6 space-y-4">
           {hasSelection && selectedText && (
             <div className="bg-theme-bg-darkest border border-theme-border rounded-lg p-4">
-              <div className="text-xs font-medium text-theme-text-secondary mb-2 uppercase tracking-wide">Selected Text</div>
+              <div className="text-xs font-medium text-theme-text-secondary mb-2 uppercase tracking-wide">
+                Selected Text
+              </div>
               <div className="text-sm text-theme-text-primary bg-theme-bg-primary rounded p-3 max-h-32 overflow-y-auto font-mono">
                 {selectedText.length > 200 ? `${selectedText.substring(0, 200)}...` : selectedText}
               </div>
-              <div className="text-xs text-gray-500 mt-2">The AI will analyze and replace this selection.</div>
+              <div className="text-xs text-gray-500 mt-2">
+                The AI will analyze and replace this selection.
+              </div>
             </div>
           )}
 
           <div>
             <label className="block text-sm font-medium text-theme-text-primary mb-3">
-              {hasSelection ? 'What would you like the AI to do with the selected text?' : 'What would you like to generate?'}
+              {hasSelection
+                ? 'What would you like the AI to do with the selected text?'
+                : 'What would you like to generate?'}
             </label>
             <textarea
               ref={textareaRef}
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={hasSelection ? "e.g., Improve this section, rewrite it more clearly, expand on this idea..." : "e.g., Write a blog post about React hooks, Create a summary of best practices..."}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder={
+                hasSelection
+                  ? 'e.g., Improve this section, rewrite it more clearly, expand on this idea...'
+                  : 'e.g., Write a blog post about React hooks, Create a summary of best practices...'
+              }
               className="w-full bg-theme-bg-darkest border border-theme-border rounded-lg px-4 py-3 text-theme-text-primary placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1] focus:border-transparent transition-all resize-none"
               rows={6}
               disabled={isGenerating}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   handleGenerate();
@@ -288,11 +312,18 @@ export default function AIPromptDialog({
           </div>
 
           <div className="text-xs text-gray-500 text-center">
-            Press <kbd className="px-2 py-1 bg-theme-bg-darkest border border-theme-border rounded">⌘</kbd> + <kbd className="px-2 py-1 bg-theme-bg-darkest border border-theme-border rounded">Enter</kbd> to generate
+            Press{' '}
+            <kbd className="px-2 py-1 bg-theme-bg-darkest border border-theme-border rounded">
+              ⌘
+            </kbd>{' '}
+            +{' '}
+            <kbd className="px-2 py-1 bg-theme-bg-darkest border border-theme-border rounded">
+              Enter
+            </kbd>{' '}
+            to generate
           </div>
         </div>
       </div>
     </div>
   );
 }
-

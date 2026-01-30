@@ -49,7 +49,7 @@ export async function exportNotesAsJSON(notes: Note[]): Promise<void> {
     const zip = new JSZip();
 
     // Add each note as an individual JSON file
-    notes.forEach((note) => {
+    notes.forEach(note => {
       const fileName = generateUniqueFileName(note.title, note.id, 'json');
       zip.file(fileName, JSON.stringify(note, null, 2));
     });
@@ -75,7 +75,7 @@ export async function exportNotesAsMarkdown(notes: Note[]): Promise<void> {
     const zip = new JSZip();
 
     // Add each note as an individual Markdown file
-    notes.forEach((note) => {
+    notes.forEach(note => {
       const fileName = generateUniqueFileName(note.title, note.id, 'md');
       const markdown = `# ${note.title}\n\n${note.content}`;
       zip.file(fileName, markdown);
@@ -89,4 +89,3 @@ export async function exportNotesAsMarkdown(notes: Note[]): Promise<void> {
     throw new Error('Failed to create export file.');
   }
 }
-

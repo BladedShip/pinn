@@ -24,8 +24,8 @@ export const EDITOR_TOOLS = {
     class: List,
     inlineToolbar: true,
     config: {
-      defaultStyle: 'unordered'
-    }
+      defaultStyle: 'unordered',
+    },
   },
   checklist: {
     class: Checklist,
@@ -36,7 +36,7 @@ export const EDITOR_TOOLS = {
     inlineToolbar: true,
     config: {
       quotePlaceholder: 'Enter a quote',
-      captionPlaceholder: 'Quote\'s author',
+      captionPlaceholder: "Quote's author",
     },
   },
   code: Code,
@@ -55,44 +55,44 @@ export const EDITOR_TOOLS = {
   linkTool: {
     class: LinkTool,
     config: {
-        // No backend for now, so link previews might not work fully without custom fetcher
-        // but adding it prevents crash if block exists
-    }
+      // No backend for now, so link previews might not work fully without custom fetcher
+      // but adding it prevents crash if block exists
+    },
   },
   image: {
     class: ImageTool,
     config: {
-        // We configure it to accept URLs.
-        // Real file upload needs backend or custom uploader (to base64).
-        // For now we rely on external URLs or pasting images (which defaults to byFile upload attempt).
-        // Since we are offline-first/local, maybe we should implement a base64 uploader?
-        // But for this task, ensuring the tool exists is priority.
-        uploader: {
-            uploadByFile(file: File) {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        resolve({
-                            success: 1,
-                            file: {
-                                url: e.target?.result
-                            }
-                        });
-                    };
-                    reader.readAsDataURL(file);
-                });
-            },
-            uploadByUrl(url: string) {
-                return new Promise((resolve) => {
-                    resolve({
-                        success: 1,
-                        file: {
-                            url: url
-                        }
-                    });
-                });
-            }
-        }
-    }
-  }
+      // We configure it to accept URLs.
+      // Real file upload needs backend or custom uploader (to base64).
+      // For now we rely on external URLs or pasting images (which defaults to byFile upload attempt).
+      // Since we are offline-first/local, maybe we should implement a base64 uploader?
+      // But for this task, ensuring the tool exists is priority.
+      uploader: {
+        uploadByFile(file: File) {
+          return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = e => {
+              resolve({
+                success: 1,
+                file: {
+                  url: e.target?.result,
+                },
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        },
+        uploadByUrl(url: string) {
+          return new Promise(resolve => {
+            resolve({
+              success: 1,
+              file: {
+                url: url,
+              },
+            });
+          });
+        },
+      },
+    },
+  },
 };

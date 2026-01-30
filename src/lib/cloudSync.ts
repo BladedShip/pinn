@@ -3,11 +3,7 @@
  * Enables users to sync their notes to Firebase Realtime Database
  */
 
-import { 
-  isFolderConfigured, 
-  hasDirectoryAccess,
-  getDirectoryHandle 
-} from './fileSystemStorage';
+import { isFolderConfigured, hasDirectoryAccess, getDirectoryHandle } from './fileSystemStorage';
 import { logger } from '../utils/logger';
 
 export interface CloudConfig {
@@ -38,9 +34,9 @@ export async function getCloudConfig(): Promise<CloudConfig | null> {
     const fileHandle = await dirHandle.getFileHandle(CONFIG_FILE, { create: false });
     const file = await fileHandle.getFile();
     const text = await file.text();
-    
+
     if (!text.trim()) return null;
-    
+
     const config = JSON.parse(text);
     return config;
   } catch (error: any) {
@@ -138,7 +134,6 @@ function saveLastSyncState(state: SyncState): void {
   }
 }
 
-
 /**
  * Calculate size of JSON string in bytes
  */
@@ -156,32 +151,32 @@ function chunkArray<T>(array: T[], maxSizeBytes: number): T[][] {
   const chunks: T[][] = [];
   let currentChunk: T[] = [];
   let currentSize = 0;
-  
+
   for (const item of array) {
     const itemJson = JSON.stringify(item);
     const itemSize = new Blob([itemJson]).size;
-    
+
     // If single item exceeds max size, include it anyway (will need to be handled separately)
     if (itemSize > maxSizeBytes) {
       logger.warn(`Item size (${itemSize} bytes) exceeds chunk size limit (${maxSizeBytes} bytes)`);
     }
-    
+
     // Check if adding this item would exceed the limit
     if (currentSize + itemSize > maxSizeBytes && currentChunk.length > 0) {
       chunks.push(currentChunk);
       currentChunk = [];
       currentSize = 0;
     }
-    
+
     currentChunk.push(item);
     currentSize += itemSize;
   }
-  
+
   // Add remaining chunk
   if (currentChunk.length > 0) {
     chunks.push(currentChunk);
   }
-  
+
   return chunks;
 }
 
@@ -208,7 +203,10 @@ interface DataFile {
  * @param selectedFlowIds Optional array of flow IDs to include. If not provided, all flows are included.
  * @returns Array of data files, with chunked files if needed
  */
-async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: string[]): Promise<DataFile[]> {
+async function getAllDataFiles(
+  selectedNoteIds?: string[],
+  selectedFlowIds?: string[]
+): Promise<DataFile[]> {
   const dataFiles: DataFile[] = [];
 
   if (!isFolderConfigured() || !hasDirectoryAccess()) {
@@ -235,7 +233,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
       }
       dataFiles.push({ name: 'notes.json', content: notesContent });
     }
-    
+
     // Filter flows if selection is provided
     if (flowsData) {
       let flowsContent = flowsData;
@@ -252,7 +250,7 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
       }
       dataFiles.push({ name: 'flows.json', content: flowsContent });
     }
-    
+
     if (categoriesData) dataFiles.push({ name: 'flowCategories.json', content: categoriesData });
     if (themeData) dataFiles.push({ name: 'theme.json', content: themeData });
     if (cloudConfigData) dataFiles.push({ name: 'cloudConfig.json', content: cloudConfigData });
@@ -268,9 +266,9 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
     // Read notes from new structure
     const { readAllNotesFromDirectory } = await import('./fileSystemStorage');
     const allNotes = await readAllNotesFromDirectory(true); // Load full content for sync
-    
+
     let notesToSync = allNotes;
-    
+
     // Apply incremental sync filter if no specific selection and last sync exists
     const lastSync = getLastSyncState();
     if (lastSync && selectedNoteIds === undefined) {
@@ -282,21 +280,25 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
         // Include if: not synced before OR updated after last sync
         return !wasSynced || noteUpdated > lastSyncTime;
       });
-      logger.log(`Incremental sync: ${notesToSync.length} of ${allNotes.length} notes changed since last sync`);
+      logger.log(
+        `Incremental sync: ${notesToSync.length} of ${allNotes.length} notes changed since last sync`
+      );
     } else if (selectedNoteIds !== undefined) {
       // Respect explicit selection
       notesToSync = allNotes.filter((note: any) => selectedNoteIds.includes(note.id));
     }
-    
+
     // Check if chunking is needed for notes
     const notesJson = JSON.stringify(notesToSync);
     const notesSize = getJsonSize(notesJson);
-    
+
     if (notesSize > CHUNK_SIZE_LIMIT_BYTES) {
       // Split into chunks
       const chunks = chunkArray(notesToSync, TARGET_CHUNK_SIZE_BYTES);
-      logger.log(`Notes size (${(notesSize / (1024 * 1024)).toFixed(2)}MB) exceeds limit, splitting into ${chunks.length} chunks`);
-      
+      logger.log(
+        `Notes size (${(notesSize / (1024 * 1024)).toFixed(2)}MB) exceeds limit, splitting into ${chunks.length} chunks`
+      );
+
       chunks.forEach((chunk, index) => {
         dataFiles.push({
           name: `notes_${index}.json`,
@@ -317,9 +319,9 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
     // Read flows from new structure
     const { readAllFlowsFromDirectory } = await import('./fileSystemStorage');
     const allFlows = await readAllFlowsFromDirectory();
-    
+
     let flowsToSync = allFlows;
-    
+
     // Apply incremental sync filter if no specific selection and last sync exists
     const lastSync = getLastSyncState();
     if (lastSync && selectedFlowIds === undefined) {
@@ -331,21 +333,25 @@ async function getAllDataFiles(selectedNoteIds?: string[], selectedFlowIds?: str
         // Include if: not synced before OR updated after last sync
         return !wasSynced || flowUpdated > lastSyncTime;
       });
-      logger.log(`Incremental sync: ${flowsToSync.length} of ${allFlows.length} flows changed since last sync`);
+      logger.log(
+        `Incremental sync: ${flowsToSync.length} of ${allFlows.length} flows changed since last sync`
+      );
     } else if (selectedFlowIds !== undefined) {
       // Respect explicit selection
       flowsToSync = allFlows.filter((flow: any) => selectedFlowIds.includes(flow.id));
     }
-    
+
     // Check if chunking is needed for flows
     const flowsJson = JSON.stringify(flowsToSync);
     const flowsSize = getJsonSize(flowsJson);
-    
+
     if (flowsSize > CHUNK_SIZE_LIMIT_BYTES) {
       // Split into chunks
       const chunks = chunkArray(flowsToSync, TARGET_CHUNK_SIZE_BYTES);
-      logger.log(`Flows size (${(flowsSize / (1024 * 1024)).toFixed(2)}MB) exceeds limit, splitting into ${chunks.length} chunks`);
-      
+      logger.log(
+        `Flows size (${(flowsSize / (1024 * 1024)).toFixed(2)}MB) exceeds limit, splitting into ${chunks.length} chunks`
+      );
+
       chunks.forEach((chunk, index) => {
         dataFiles.push({
           name: `flows_${index}.json`,
@@ -396,20 +402,23 @@ export async function downloadFileFromCloud(
 ): Promise<any | null> {
   const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
   const downloadUrls = [
-    ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json?auth=${config.apiKey}`),
+    ...commonRegions.map(
+      region =>
+        `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json?auth=${config.apiKey}`
+    ),
     `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json?auth=${config.apiKey}`,
   ];
 
   for (const url of downloadUrls) {
     try {
       let response = await fetch(url);
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data === null) {
           return null; // File doesn't exist
         }
-        
+
         // Extract content from Realtime Database structure
         if (data && typeof data === 'object' && data !== null) {
           if (data.content !== undefined) {
@@ -442,7 +451,7 @@ export async function downloadFileFromCloud(
       continue; // Try next URL
     }
   }
-  
+
   return null; // Not found
 }
 
@@ -487,7 +496,7 @@ function mergeItemsById(existingItems: any[], newItems: any[]): any[] {
  * @param selectedFlowIds Optional array of flow IDs to sync. If not provided, all flows are synced.
  */
 export async function uploadToCloud(
-  config: CloudConfig, 
+  config: CloudConfig,
   onProgress?: (percent: number) => void,
   selectedNoteIds?: string[],
   selectedFlowIds?: string[]
@@ -498,25 +507,25 @@ export async function uploadToCloud(
 
   // Create a timestamp for this sync
   const timestamp = new Date().toISOString();
-  
+
   // Find the user ID that has existing data (so all devices sync to the same location)
   // If no existing data found, use current device's user ID
   const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
   let targetUserId: string | null = null;
-  
+
   // Try to find existing user ID with data
   for (const region of commonRegions) {
     try {
       // Try with auth first
       let usersUrl = `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users.json?auth=${config.apiKey}`;
       let response = await fetch(usersUrl);
-      
+
       // If that fails, try without auth (test mode)
       if (!response.ok && (response.status === 401 || response.status === 403)) {
         usersUrl = `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users.json`;
         response = await fetch(usersUrl);
       }
-      
+
       if (response.ok) {
         const usersData = await response.json();
         if (usersData && typeof usersData === 'object' && usersData !== null) {
@@ -524,7 +533,9 @@ export async function uploadToCloud(
           if (userIds.length > 0) {
             // Use the first user ID found (or you could use the one with most recent data)
             targetUserId = userIds[0];
-            logger.log(`Found existing user ID with data: ${targetUserId}, will sync to this location`);
+            logger.log(
+              `Found existing user ID with data: ${targetUserId}, will sync to this location`
+            );
             break;
           }
         }
@@ -533,13 +544,13 @@ export async function uploadToCloud(
       continue;
     }
   }
-  
+
   // If no existing user ID found, use current device's user ID
   if (!targetUserId) {
     targetUserId = getUserId();
     logger.log(`No existing data found, using current device user ID: ${targetUserId}`);
   }
-  
+
   const dataPath = `users/${targetUserId}`;
 
   // Download existing data from cloud for merging
@@ -588,15 +599,17 @@ export async function uploadToCloud(
 
   // Get local data files (filtered if selections provided)
   const dataFiles = await getAllDataFiles(selectedNoteIds, selectedFlowIds);
-  
+
   if (dataFiles.length === 0) {
     throw new Error('No data to sync');
   }
 
   // Merge notes - handle both chunked and non-chunked formats
-  const notesChunksToMerge = dataFiles.filter(f => f.name.startsWith('notes_') && f.name.endsWith('.json'));
+  const notesChunksToMerge = dataFiles.filter(
+    f => f.name.startsWith('notes_') && f.name.endsWith('.json')
+  );
   const notesFileToMerge = dataFiles.find(f => f.name === 'notes.json');
-  
+
   if (notesChunksToMerge.length > 0) {
     // Handle chunked notes
     try {
@@ -608,19 +621,22 @@ export async function uploadToCloud(
           localNotes.push(...chunkNotes);
         }
       });
-      
+
       // Merge with existing notes
       const mergedNotes = mergeItemsById(existingNotes, localNotes);
-      
+
       // Update chunks with merged data (re-chunk if needed)
       const mergedJson = JSON.stringify(mergedNotes);
       const mergedSize = getJsonSize(mergedJson);
-      
+
       if (mergedSize > CHUNK_SIZE_LIMIT_BYTES) {
         // Re-chunk merged data
         const chunks = chunkArray(mergedNotes, TARGET_CHUNK_SIZE_BYTES);
         // Remove old chunks
-        dataFiles.splice(dataFiles.findIndex(f => f.name.startsWith('notes_')), notesChunksToMerge.length);
+        dataFiles.splice(
+          dataFiles.findIndex(f => f.name.startsWith('notes_')),
+          notesChunksToMerge.length
+        );
         // Add new chunks
         chunks.forEach((chunk, index) => {
           dataFiles.push({
@@ -633,11 +649,16 @@ export async function uploadToCloud(
         });
       } else {
         // Convert back to single file
-        dataFiles.splice(dataFiles.findIndex(f => f.name.startsWith('notes_')), notesChunksToMerge.length);
+        dataFiles.splice(
+          dataFiles.findIndex(f => f.name.startsWith('notes_')),
+          notesChunksToMerge.length
+        );
         dataFiles.push({ name: 'notes.json', content: mergedJson });
       }
-      
-      logger.log(`Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`);
+
+      logger.log(
+        `Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`
+      );
     } catch (e) {
       logger.warn('Error merging chunked notes:', e);
     }
@@ -649,7 +670,9 @@ export async function uploadToCloud(
         // Merge: update existing notes and add new ones, but keep all existing notes
         const mergedNotes = mergeItemsById(existingNotes, localNotes);
         notesFileToMerge.content = JSON.stringify(mergedNotes);
-        logger.log(`Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`);
+        logger.log(
+          `Merged notes: ${existingNotes.length} existing + ${localNotes.length} local = ${mergedNotes.length} total`
+        );
       }
     } catch (e) {
       logger.warn('Error merging notes:', e);
@@ -660,9 +683,11 @@ export async function uploadToCloud(
   }
 
   // Merge flows - handle both chunked and non-chunked formats
-  const flowsChunksToMerge = dataFiles.filter(f => f.name.startsWith('flows_') && f.name.endsWith('.json'));
+  const flowsChunksToMerge = dataFiles.filter(
+    f => f.name.startsWith('flows_') && f.name.endsWith('.json')
+  );
   const flowsFileToMerge = dataFiles.find(f => f.name === 'flows.json');
-  
+
   if (flowsChunksToMerge.length > 0) {
     // Handle chunked flows
     try {
@@ -674,19 +699,22 @@ export async function uploadToCloud(
           localFlows.push(...chunkFlows);
         }
       });
-      
+
       // Merge with existing flows
       const mergedFlows = mergeItemsById(existingFlows, localFlows);
-      
+
       // Update chunks with merged data (re-chunk if needed)
       const mergedJson = JSON.stringify(mergedFlows);
       const mergedSize = getJsonSize(mergedJson);
-      
+
       if (mergedSize > CHUNK_SIZE_LIMIT_BYTES) {
         // Re-chunk merged data
         const chunks = chunkArray(mergedFlows, TARGET_CHUNK_SIZE_BYTES);
         // Remove old chunks
-        dataFiles.splice(dataFiles.findIndex(f => f.name.startsWith('flows_')), flowsChunksToMerge.length);
+        dataFiles.splice(
+          dataFiles.findIndex(f => f.name.startsWith('flows_')),
+          flowsChunksToMerge.length
+        );
         // Add new chunks
         chunks.forEach((chunk, index) => {
           dataFiles.push({
@@ -699,11 +727,16 @@ export async function uploadToCloud(
         });
       } else {
         // Convert back to single file
-        dataFiles.splice(dataFiles.findIndex(f => f.name.startsWith('flows_')), flowsChunksToMerge.length);
+        dataFiles.splice(
+          dataFiles.findIndex(f => f.name.startsWith('flows_')),
+          flowsChunksToMerge.length
+        );
         dataFiles.push({ name: 'flows.json', content: mergedJson });
       }
-      
-      logger.log(`Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`);
+
+      logger.log(
+        `Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`
+      );
     } catch (e) {
       logger.warn('Error merging chunked flows:', e);
     }
@@ -715,7 +748,9 @@ export async function uploadToCloud(
         // Merge: update existing flows and add new ones, but keep all existing flows
         const mergedFlows = mergeItemsById(existingFlows, localFlows);
         flowsFileToMerge.content = JSON.stringify(mergedFlows);
-        logger.log(`Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`);
+        logger.log(
+          `Merged flows: ${existingFlows.length} existing + ${localFlows.length} local = ${mergedFlows.length} total`
+        );
       }
     } catch (e) {
       logger.warn('Error merging flows:', e);
@@ -763,13 +798,13 @@ export async function uploadToCloud(
   // Upload each file to Realtime Database
   let uploadedCount = 0;
   const totalFiles = dataFiles.length;
-  
+
   for (const file of dataFiles) {
     try {
       // Use Firebase Realtime Database REST API
       // Try different URL formats - Firebase uses different formats for different regions
       const dbName = file.name.replace('.json', ''); // Remove .json extension
-      
+
       // Try different URL formats - Firebase uses different formats based on region
       // New format: https://{projectId}-default-rtdb.{region}.firebasedatabase.app
       // Old format: https://{projectId}.firebaseio.com
@@ -777,11 +812,14 @@ export async function uploadToCloud(
       const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
       const urlFormats = [
         // Try with common regions first (most likely to work)
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json`),
+        ...commonRegions.map(
+          region =>
+            `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/${dbName}.json`
+        ),
         // Fallback to old format
         `https://${config.projectId}.firebaseio.com/${dataPath}/${dbName}.json`,
       ];
-      
+
       // Parse the content to ensure it's valid JSON
       let parsedContent;
       try {
@@ -806,7 +844,7 @@ export async function uploadToCloud(
           // For Realtime Database, we can use the API key, but rules must allow it
           // Or we can use it without auth if rules allow public access (test mode)
           const dbUrl = `${baseUrl}?auth=${config.apiKey}`;
-          
+
           response = await fetch(dbUrl, {
             method: 'PUT',
             headers: {
@@ -827,12 +865,12 @@ export async function uploadToCloud(
               },
               body: JSON.stringify(dataToUpload),
             });
-            
+
             if (response.ok) {
               break; // Success with public access
             }
           }
-          
+
           lastError = await response.text();
         } catch (err) {
           lastError = err instanceof Error ? err.message : 'Unknown error';
@@ -841,17 +879,23 @@ export async function uploadToCloud(
       }
 
       if (!response || !response.ok) {
-        const errorText = lastError || await response?.text() || 'Unknown error';
+        const errorText = lastError || (await response?.text()) || 'Unknown error';
         logger.error('Upload error response:', errorText);
         logger.error('Tried URLs:', urlFormats);
-        
+
         // Provide helpful error messages
         if (response?.status === 403) {
-          throw new Error('Permission denied. Please check your Realtime Database rules. Make sure they allow write access (test mode allows this).');
+          throw new Error(
+            'Permission denied. Please check your Realtime Database rules. Make sure they allow write access (test mode allows this).'
+          );
         } else if (response?.status === 401) {
-          throw new Error('Authentication failed. Please check your API key and make sure Realtime Database is enabled.');
+          throw new Error(
+            'Authentication failed. Please check your API key and make sure Realtime Database is enabled.'
+          );
         } else if (response?.status === 404) {
-          throw new Error('Database not found. Please verify: 1) Realtime Database is enabled in Firebase Console, 2) Your Project ID is correct, 3) Database URL is accessible. Check REALTIME_DB_SETUP.md for setup instructions.');
+          throw new Error(
+            'Database not found. Please verify: 1) Realtime Database is enabled in Firebase Console, 2) Your Project ID is correct, 3) Database URL is accessible. Check REALTIME_DB_SETUP.md for setup instructions.'
+          );
         } else {
           throw new Error(`Upload failed (${response?.status || 'network error'}): ${errorText}`);
         }
@@ -865,13 +909,17 @@ export async function uploadToCloud(
       }
     } catch (error) {
       logger.error(`Error uploading ${file.name}:`, error);
-      
+
       // Check if it's a network error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error(`Network error: Could not connect to Firebase. Please check your internet connection.`);
+        throw new Error(
+          `Network error: Could not connect to Firebase. Please check your internet connection.`
+        );
       }
-      
-      throw new Error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      throw new Error(
+        `Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -881,15 +929,19 @@ export async function uploadToCloud(
   }
 
   // Collect chunk info and synced IDs
-  const notesChunksForMetadata = dataFiles.filter(f => f.name.startsWith('notes_') && f.name.endsWith('.json'));
-  const flowsChunksForMetadata = dataFiles.filter(f => f.name.startsWith('flows_') && f.name.endsWith('.json'));
+  const notesChunksForMetadata = dataFiles.filter(
+    f => f.name.startsWith('notes_') && f.name.endsWith('.json')
+  );
+  const flowsChunksForMetadata = dataFiles.filter(
+    f => f.name.startsWith('flows_') && f.name.endsWith('.json')
+  );
   const notesFileForMetadata = dataFiles.find(f => f.name === 'notes.json');
   const flowsFileForMetadata = dataFiles.find(f => f.name === 'flows.json');
-  
+
   // Collect all synced note and flow IDs
   const syncedNoteIds: string[] = [];
   const syncedFlowIds: string[] = [];
-  
+
   if (notesChunksForMetadata.length > 0) {
     notesChunksForMetadata.forEach(chunk => {
       try {
@@ -915,7 +967,7 @@ export async function uploadToCloud(
       logger.warn('Error parsing notes for ID collection:', e);
     }
   }
-  
+
   if (flowsChunksForMetadata.length > 0) {
     flowsChunksForMetadata.forEach(chunk => {
       try {
@@ -945,10 +997,13 @@ export async function uploadToCloud(
   try {
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const metadataUrls = [
-      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`),
+      ...commonRegions.map(
+        region =>
+          `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`
+      ),
       `https://${config.projectId}.firebaseio.com/${dataPath}/_metadata.json?auth=${config.apiKey}`,
     ];
-    
+
     const metadata = {
       lastSync: timestamp,
       lastSyncTimestamp: timestamp,
@@ -962,7 +1017,7 @@ export async function uploadToCloud(
       changedNotesCount: syncedNoteIds.length,
       changedFlowsCount: syncedFlowIds.length,
     };
-    
+
     for (const url of metadataUrls) {
       try {
         const response = await fetch(url, {
@@ -972,7 +1027,7 @@ export async function uploadToCloud(
           },
           body: JSON.stringify(metadata),
         });
-        
+
         if (response.ok) {
           break; // Success
         }
@@ -993,7 +1048,7 @@ export async function uploadToCloud(
         }
       }
     }
-    
+
     // Save sync state locally after successful upload
     saveLastSyncState({
       timestamp,
@@ -1017,7 +1072,7 @@ export async function uploadToCloud(
  * @param selectedFlowIds Optional array of flow IDs to download. If not provided, all flows are downloaded.
  */
 export async function downloadFromCloud(
-  config: CloudConfig, 
+  config: CloudConfig,
   onProgress?: (percent: number) => void,
   selectedNoteIds?: string[],
   selectedFlowIds?: string[]
@@ -1030,23 +1085,23 @@ export async function downloadFromCloud(
   // Since rules only allow access to /users/$userId (not /users), we need to try different approaches
   const userId = getUserId();
   logger.log(`Downloading from database, projectId: ${config.projectId}`);
-  
+
   const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
   let foundUserPath: string | null = null;
-  
+
   // Strategy 1: Try to access /users.json without auth (test mode might allow this)
   for (const region of commonRegions) {
     try {
       // Try with auth first
       let usersUrl = `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users.json?auth=${config.apiKey}`;
       let response = await fetch(usersUrl);
-      
+
       // If that fails, try without auth (test mode)
       if (!response.ok && (response.status === 401 || response.status === 403)) {
         usersUrl = `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/users.json`;
         response = await fetch(usersUrl);
       }
-      
+
       if (response.ok) {
         const usersData = await response.json();
         if (usersData && typeof usersData === 'object' && usersData !== null) {
@@ -1064,24 +1119,29 @@ export async function downloadFromCloud(
       continue;
     }
   }
-  
+
   // Strategy 2: If we can't list users (rules don't allow /users read), we need to try known user IDs
   // Since we can't discover them, we'll try the current user's path
   // But if that returns null for all files, we know it's the wrong user ID
   if (!foundUserPath) {
     foundUserPath = `users/${userId}`;
     logger.log(`Using current user path: ${foundUserPath}`);
-    logger.warn(`Note: If downloads return null, the database rules may need to allow reading /users to discover user IDs. Current rules only allow /users/$userId access.`);
+    logger.warn(
+      `Note: If downloads return null, the database rules may need to allow reading /users to discover user IDs. Current rules only allow /users/$userId access.`
+    );
   }
-  
+
   // First, try to download metadata to check for chunking
   let metadata: any = null;
   try {
     const metadataUrls = [
-      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/_metadata.json?auth=${config.apiKey}`),
+      ...commonRegions.map(
+        region =>
+          `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/_metadata.json?auth=${config.apiKey}`
+      ),
       `https://${config.projectId}.firebaseio.com/${foundUserPath}/_metadata.json?auth=${config.apiKey}`,
     ];
-    
+
     for (const url of metadataUrls) {
       try {
         let response = await fetch(url);
@@ -1109,20 +1169,23 @@ export async function downloadFromCloud(
 
   const files = ['notes', 'folders', 'flows', 'flowCategories', 'theme', 'cloudConfig']; // Without .json extension
   const downloadedFiles: { [key: string]: string } = {};
-  
+
   let downloadedCount = 0;
 
   // Helper function to download chunks
   const downloadChunks = async (baseName: string, chunkCount: number): Promise<string | null> => {
     const chunks: any[] = [];
-    
+
     for (let i = 0; i < chunkCount; i++) {
       const chunkName = `${baseName}_${i}`;
       const downloadUrls = [
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${chunkName}.json?auth=${config.apiKey}`),
+        ...commonRegions.map(
+          region =>
+            `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${chunkName}.json?auth=${config.apiKey}`
+        ),
         `https://${config.projectId}.firebaseio.com/${foundUserPath}/${chunkName}.json?auth=${config.apiKey}`,
       ];
-      
+
       let chunkData: any = null;
       for (const url of downloadUrls) {
         try {
@@ -1145,7 +1208,7 @@ export async function downloadFromCloud(
           continue;
         }
       }
-      
+
       if (chunkData) {
         const chunkContent = typeof chunkData === 'string' ? chunkData : JSON.stringify(chunkData);
         try {
@@ -1160,17 +1223,18 @@ export async function downloadFromCloud(
         logger.warn(`Could not download chunk ${chunkName}`);
       }
     }
-    
+
     return chunks.length > 0 ? JSON.stringify(chunks) : null;
   };
 
   for (const dbName of files) {
     // Check if this file is chunked (notes or flows)
-    const isChunked = (dbName === 'notes' && metadata?.notesChunked) || 
-                      (dbName === 'flows' && metadata?.flowsChunked);
-    const chunkCount = dbName === 'notes' ? metadata?.notesChunks : 
-                      dbName === 'flows' ? metadata?.flowsChunks : 0;
-    
+    const isChunked =
+      (dbName === 'notes' && metadata?.notesChunked) ||
+      (dbName === 'flows' && metadata?.flowsChunked);
+    const chunkCount =
+      dbName === 'notes' ? metadata?.notesChunks : dbName === 'flows' ? metadata?.flowsChunks : 0;
+
     if (isChunked && chunkCount > 0) {
       // Download chunks
       logger.log(`Downloading ${chunkCount} chunks for ${dbName}`);
@@ -1187,45 +1251,56 @@ export async function downloadFromCloud(
         // Fall through to try single file
       }
     }
-    
+
     // Regular download logic (for non-chunked files or fallback)
     try {
       // Use Firebase Realtime Database REST API
       // Try different URL formats with common regions
       // Use the found path (or current user path)
       const downloadUrls = [
-        ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${dbName}.json?auth=${config.apiKey}`),
+        ...commonRegions.map(
+          region =>
+            `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${dbName}.json?auth=${config.apiKey}`
+        ),
         `https://${config.projectId}.firebaseio.com/${foundUserPath}/${dbName}.json?auth=${config.apiKey}`,
       ];
-      
+
       let response: Response | null = null;
       let successfulUrl: string | null = null;
-      
+
       // Try each URL format
       let downloadedData: any = null;
       for (const url of downloadUrls) {
         try {
-          logger.log(`Trying to download ${dbName} from: ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+          logger.log(
+            `Trying to download ${dbName} from: ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`
+          );
           response = await fetch(url);
           logger.log(`Response for ${dbName}: status=${response.status}, ok=${response.ok}`);
-          
+
           if (response.ok) {
             const data = await response.json();
-            logger.log(`Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, isEmpty: ${data && typeof data === 'object' && data !== null && Object.keys(data).length === 0}, keys: ${data && typeof data === 'object' && data !== null ? Object.keys(data).join(',') : 'N/A'}`);
-            
+            logger.log(
+              `Got data for ${dbName}, type: ${typeof data}, isNull: ${data === null}, isEmpty: ${data && typeof data === 'object' && data !== null && Object.keys(data).length === 0}, keys: ${data && typeof data === 'object' && data !== null ? Object.keys(data).join(',') : 'N/A'}`
+            );
+
             // If data is null, it means the path exists but is empty - this is valid, skip it
             // But if we're using the wrong user ID, we should try to find the right one
             if (data === null) {
-              logger.log(`Path exists but data is null for ${dbName} at ${foundUserPath} - this user ID may not have data`);
+              logger.log(
+                `Path exists but data is null for ${dbName} at ${foundUserPath} - this user ID may not have data`
+              );
               // Don't break - continue to try other regions, but if all return null, we know this user ID is wrong
               continue;
             }
-            
+
             // Accept any response that's not null
             if (data !== null && data !== undefined) {
               successfulUrl = url;
               downloadedData = data;
-              logger.log(`Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
+              logger.log(
+                `Successfully found ${dbName} at ${url.replace(config.apiKey, 'API_KEY_HIDDEN')}`
+              );
               break; // Success - exit the loop
             }
           } else if (response.status === 401 || response.status === 403) {
@@ -1233,10 +1308,14 @@ export async function downloadFromCloud(
             const publicUrl = url.replace('?auth=' + config.apiKey, '');
             logger.log(`Trying without auth: ${publicUrl}`);
             response = await fetch(publicUrl);
-            logger.log(`Public response for ${dbName}: status=${response.status}, ok=${response.ok}`);
+            logger.log(
+              `Public response for ${dbName}: status=${response.status}, ok=${response.ok}`
+            );
             if (response.ok) {
               const data = await response.json();
-              logger.log(`Got public data for ${dbName}, type: ${typeof data}, isNull: ${data === null}`);
+              logger.log(
+                `Got public data for ${dbName}, type: ${typeof data}, isNull: ${data === null}`
+              );
               if (data !== null) {
                 successfulUrl = publicUrl;
                 downloadedData = data;
@@ -1250,31 +1329,32 @@ export async function downloadFromCloud(
           continue; // Try next URL
         }
       }
-      
+
       if (successfulUrl && downloadedData !== null) {
-        logger.log(`Successfully connected to ${dbName} at: ${successfulUrl.replace(config.apiKey, 'API_KEY_HIDDEN')}`);
-        
+        logger.log(
+          `Successfully connected to ${dbName} at: ${successfulUrl.replace(config.apiKey, 'API_KEY_HIDDEN')}`
+        );
+
         const data = downloadedData;
-        
+
         // Debug: Log the actual data structure received
         logger.log(`Downloaded ${dbName}:`, {
           type: typeof data,
           hasContent: data?.content !== undefined,
           keys: data && typeof data === 'object' ? Object.keys(data) : 'N/A',
-          sample: data && typeof data === 'object' ? JSON.stringify(data).substring(0, 200) : data
+          sample: data && typeof data === 'object' ? JSON.stringify(data).substring(0, 200) : data,
         });
-        
+
         // Extract content from Realtime Database structure
         // Data might be stored as { content: ..., fileName: ..., lastUpdated: ... }
         // or directly as the content itself
         let fileContent: string | null = null;
-        
+
         if (data && typeof data === 'object' && data !== null) {
           if (data.content !== undefined) {
             // Wrapped structure: { content: ..., fileName: ..., lastUpdated: ... }
-            fileContent = typeof data.content === 'string' 
-              ? data.content 
-              : JSON.stringify(data.content);
+            fileContent =
+              typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
           } else if (Object.keys(data).length > 0) {
             // Direct object content - stringify the whole object
             fileContent = JSON.stringify(data);
@@ -1284,20 +1364,22 @@ export async function downloadFromCloud(
           }
         } else if (data !== null && data !== undefined) {
           // Direct content (string or other primitive)
-          fileContent = typeof data === 'string' 
-            ? data 
-            : JSON.stringify(data);
+          fileContent = typeof data === 'string' ? data : JSON.stringify(data);
         }
-        
+
         if (fileContent !== null) {
           // Filter notes or flows if selections are provided
           if (dbName === 'notes' && selectedNoteIds !== undefined) {
             try {
               const notes = JSON.parse(fileContent);
               if (Array.isArray(notes)) {
-                const filteredNotes = notes.filter((note: any) => selectedNoteIds.includes(note.id));
+                const filteredNotes = notes.filter((note: any) =>
+                  selectedNoteIds.includes(note.id)
+                );
                 fileContent = JSON.stringify(filteredNotes);
-                logger.log(`Filtered notes: ${notes.length} total, ${filteredNotes.length} selected`);
+                logger.log(
+                  `Filtered notes: ${notes.length} total, ${filteredNotes.length} selected`
+                );
               }
             } catch (e) {
               logger.warn('Error filtering notes:', e);
@@ -1306,9 +1388,13 @@ export async function downloadFromCloud(
             try {
               const flows = JSON.parse(fileContent);
               if (Array.isArray(flows)) {
-                const filteredFlows = flows.filter((flow: any) => selectedFlowIds.includes(flow.id));
+                const filteredFlows = flows.filter((flow: any) =>
+                  selectedFlowIds.includes(flow.id)
+                );
                 fileContent = JSON.stringify(filteredFlows);
-                logger.log(`Filtered flows: ${flows.length} total, ${filteredFlows.length} selected`);
+                logger.log(
+                  `Filtered flows: ${flows.length} total, ${filteredFlows.length} selected`
+                );
               }
             } catch (e) {
               logger.warn('Error filtering flows:', e);
@@ -1317,30 +1403,35 @@ export async function downloadFromCloud(
 
           const fileName = `${dbName}.json`;
           downloadedFiles[fileName] = fileContent;
-          
+
           downloadedCount++;
           if (onProgress) {
             onProgress(Math.round((downloadedCount / files.length) * 100));
           }
           logger.log(`Successfully extracted content for ${dbName}`);
         } else {
-          logger.warn(`File ${dbName} downloaded but content could not be extracted. Data structure:`, typeof data, data);
+          logger.warn(
+            `File ${dbName} downloaded but content could not be extracted. Data structure:`,
+            typeof data,
+            data
+          );
         }
       } else if (response?.status === 404 || !successfulUrl) {
         // File doesn't exist - try checking for chunks (for notes/flows only)
         if ((dbName === 'notes' || dbName === 'flows') && !isChunked) {
           // Try to detect chunks by attempting to download chunk 0
           logger.log(`File ${dbName} not found, checking for chunks...`);
-          const testChunkUrl = commonRegions.map(region => 
-            `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${dbName}_0.json?auth=${config.apiKey}`
+          const testChunkUrl = commonRegions.map(
+            region =>
+              `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${foundUserPath}/${dbName}_0.json?auth=${config.apiKey}`
           )[0];
-          
+
           try {
             let testResponse = await fetch(testChunkUrl);
             if (!testResponse.ok && (testResponse.status === 401 || testResponse.status === 403)) {
               testResponse = await fetch(testChunkUrl.replace('?auth=' + config.apiKey, ''));
             }
-            
+
             if (testResponse.ok) {
               // Chunks exist! Try to download them (we'll need to find how many)
               // For now, try up to 10 chunks
@@ -1371,18 +1462,23 @@ export async function downloadFromCloud(
       }
     } catch (error) {
       logger.error(`Error downloading ${dbName}:`, error);
-      
+
       // Check if it's a network error
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error(`Network error: Could not connect to Firebase. Please check your internet connection.`);
+        throw new Error(
+          `Network error: Could not connect to Firebase. Please check your internet connection.`
+        );
       }
       // Continue with other files
     }
   }
 
   // Log summary of what was downloaded
-  logger.log(`Download complete. Files downloaded: ${Object.keys(downloadedFiles).length}`, Object.keys(downloadedFiles));
-  
+  logger.log(
+    `Download complete. Files downloaded: ${Object.keys(downloadedFiles).length}`,
+    Object.keys(downloadedFiles)
+  );
+
   // Return whatever files were found, even if empty
   // This allows downloading partial data or handling empty cloud storage gracefully
   return downloadedFiles;
@@ -1475,12 +1571,12 @@ export async function saveDownloadedData(data: { [key: string]: string }): Promi
  */
 export function getUserId(): string {
   let userId = localStorage.getItem('pinn.cloudUserId');
-  
+
   if (!userId) {
     userId = crypto.randomUUID();
     localStorage.setItem('pinn.cloudUserId', userId);
   }
-  
+
   return userId;
 }
 
@@ -1497,21 +1593,24 @@ export async function validateCloudConfig(config: CloudConfig): Promise<boolean>
     const dataPath = 'data';
     const commonRegions = ['asia-southeast1', 'us-central1', 'europe-west1', 'asia-east1'];
     const testUrls = [
-      ...commonRegions.map(region => `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`),
+      ...commonRegions.map(
+        region =>
+          `https://${config.projectId}-default-rtdb.${region}.firebasedatabase.app/${dataPath}/_metadata.json?auth=${config.apiKey}`
+      ),
       `https://${config.projectId}.firebaseio.com/${dataPath}/_metadata.json?auth=${config.apiKey}`,
     ];
-    
+
     // Try each URL format
     for (const url of testUrls) {
       try {
         // This will return 404 if data doesn't exist, but that's okay - we just want to verify the database is accessible
         let response = await fetch(url);
-        
+
         // 200 (exists), 404 (doesn't exist but database is accessible), or 403/401 (auth issue)
         if (response.status === 200 || response.status === 404) {
           return true;
         }
-        
+
         // If auth failed, try without auth (test mode allows this)
         if (response.status === 401 || response.status === 403) {
           const publicUrl = url.replace('?auth=' + config.apiKey, '');
@@ -1524,11 +1623,10 @@ export async function validateCloudConfig(config: CloudConfig): Promise<boolean>
         continue; // Try next URL format
       }
     }
-    
+
     return false;
   } catch (error) {
     logger.error('Error validating cloud config:', error);
     return false;
   }
 }
-

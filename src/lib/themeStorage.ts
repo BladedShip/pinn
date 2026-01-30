@@ -3,11 +3,7 @@
  * Manages theme preferences with localStorage and file system persistence
  */
 
-import { 
-  isFolderConfigured,
-  hasDirectoryAccess,
-  getDirectoryHandle
-} from './fileSystemStorage';
+import { isFolderConfigured, hasDirectoryAccess, getDirectoryHandle } from './fileSystemStorage';
 import { logger } from '../utils/logger';
 
 export type Theme = 'default' | 'darker';
@@ -42,7 +38,7 @@ export async function saveTheme(theme: Theme): Promise<void> {
     // Save to file system if folder is configured
     const folderConfigured = isFolderConfigured();
     const hasAccess = hasDirectoryAccess();
-    
+
     if (folderConfigured && hasAccess) {
       await saveThemeToFile(theme);
     }
@@ -70,7 +66,7 @@ export async function loadThemeFromFile(): Promise<Theme | null> {
     const fileHandle = await handle.getFileHandle(THEME_FILE, { create: false });
     const file = await fileHandle.getFile();
     const text = await file.text();
-    
+
     if (!text.trim()) {
       return null;
     }
@@ -139,4 +135,3 @@ export function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute('data-theme', theme);
   logger.log('Theme applied to document:', theme);
 }
-

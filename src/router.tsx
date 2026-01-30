@@ -1,4 +1,8 @@
-import { createRouter, RouterProvider as TanStackRouterProvider, type AnyRouter } from '@tanstack/react-router';
+import {
+  createRouter,
+  RouterProvider as TanStackRouterProvider,
+  type AnyRouter,
+} from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
 
 // Use global variable to persist router across HMR
@@ -17,12 +21,12 @@ function getRouter(): AnyRouter {
 
   // Create new router with auto-generated route tree
   const routerInstance = createRouter({ routeTree });
-  
+
   // Store in global scope
   if (typeof window !== 'undefined') {
     window.__pinn_router__ = routerInstance;
   }
-  
+
   return routerInstance;
 }
 
@@ -40,4 +44,3 @@ declare module '@tanstack/react-router' {
 export function RouterProvider() {
   return <TanStackRouterProvider router={router} />;
 }
-

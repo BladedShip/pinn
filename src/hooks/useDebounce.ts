@@ -24,4 +24,3 @@ export function useDebounce<T>(value: T, delay: number = SEARCH_CONFIG.DEBOUNCE_
 
   return debouncedValue;
 }
-

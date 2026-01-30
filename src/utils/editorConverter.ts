@@ -1,16 +1,25 @@
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
-import type { Root, Content, PhrasingContent, Heading, Paragraph, List, Code, Table, TableRow, TableCell } from 'mdast';
+import type {
+  Root,
+  Content,
+  PhrasingContent,
+  Heading,
+  Paragraph,
+  List,
+  Code,
+  Table,
+  TableRow,
+  TableCell,
+} from 'mdast';
 import type { OutputData, OutputBlockData } from '@editorjs/editorjs';
 
 /**
  * Converts Markdown string to Editor.js OutputData
  */
 export async function markdownToBlocks(markdown: string): Promise<OutputData> {
-  const processor = unified()
-    .use(remarkParse)
-    .use(remarkGfm);
+  const processor = unified().use(remarkParse).use(remarkGfm);
 
   const tree = processor.parse(markdown) as Root;
   const blocks: OutputBlockData[] = [];
@@ -37,73 +46,83 @@ export function blocksToMarkdown(data: OutputData): string {
     return '';
   }
 
-  return data.blocks.map(block => {
-    switch (block.type) {
-      case 'header':
-        const level = block.data.level || 1;
-        const prefix = '#'.repeat(level);
-        return `${prefix} ${convertHtmlToMarkdown(block.data.text)}`;
+  return data.blocks
+    .map(block => {
+      switch (block.type) {
+        case 'header':
+          const level = block.data.level || 1;
+          const prefix = '#'.repeat(level);
+          return `${prefix} ${convertHtmlToMarkdown(block.data.text)}`;
 
-      case 'paragraph':
-        return convertHtmlToMarkdown(block.data.text);
-
-      case 'list':
-        const style = block.data.style || 'unordered';
-        const items = block.data.items || [];
-        return items.map((item: string, index: number) => {
-          const content = convertHtmlToMarkdown(item);
-          return style === 'ordered' ? `${index + 1}. ${content}` : `- ${content}`;
-        }).join('\n');
-
-      case 'checklist':
-        const checkItems = block.data.items || [];
-        return checkItems.map((item: any) => {
-          const checked = item.checked ? 'x' : ' ';
-          return `- [${checked}] ${convertHtmlToMarkdown(item.text)}`;
-        }).join('\n');
-
-      case 'quote':
-        const quoteText = convertHtmlToMarkdown(block.data.text);
-        const caption = block.data.caption ? `\n> -- ${convertHtmlToMarkdown(block.data.caption)}` : '';
-        return `> ${quoteText}${caption}`;
-
-      case 'code':
-        return `\`\`\`${block.data.language || ''}\n${block.data.code}\n\`\`\``;
-
-      case 'delimiter':
-        return '---';
-
-      case 'image':
-        // Standard markdown image: ![alt](url)
-        // If there's a caption, we might lose it in standard markdown unless we use HTML
-        // but for now let's stick to standard markdown
-        const alt = block.data.caption || block.data.file?.name || 'image';
-        const url = block.data.file?.url || '';
-        return `![${alt}](${url})`;
-
-      case 'table':
-        const content = block.data.content || [];
-        if (!content.length) return '';
-
-        const withHeadings = block.data.withHeadings;
-        // Simple table generation
-        return content.map((row: string[], rowIndex: number) => {
-          const rowStr = `| ${row.map(cell => convertHtmlToMarkdown(cell)).join(' | ')} |`;
-          let separator = '';
-          if (withHeadings && rowIndex === 0) {
-            separator = '\n| ' + row.map(() => '---').join(' | ') + ' |';
-          }
-          return rowStr + separator;
-        }).join('\n');
-
-      default:
-        // Fallback for unknown blocks (or text)
-        if (block.data && block.data.text) {
+        case 'paragraph':
           return convertHtmlToMarkdown(block.data.text);
-        }
-        return '';
-    }
-  }).join('\n\n');
+
+        case 'list':
+          const style = block.data.style || 'unordered';
+          const items = block.data.items || [];
+          return items
+            .map((item: string, index: number) => {
+              const content = convertHtmlToMarkdown(item);
+              return style === 'ordered' ? `${index + 1}. ${content}` : `- ${content}`;
+            })
+            .join('\n');
+
+        case 'checklist':
+          const checkItems = block.data.items || [];
+          return checkItems
+            .map((item: any) => {
+              const checked = item.checked ? 'x' : ' ';
+              return `- [${checked}] ${convertHtmlToMarkdown(item.text)}`;
+            })
+            .join('\n');
+
+        case 'quote':
+          const quoteText = convertHtmlToMarkdown(block.data.text);
+          const caption = block.data.caption
+            ? `\n> -- ${convertHtmlToMarkdown(block.data.caption)}`
+            : '';
+          return `> ${quoteText}${caption}`;
+
+        case 'code':
+          return `\`\`\`${block.data.language || ''}\n${block.data.code}\n\`\`\``;
+
+        case 'delimiter':
+          return '---';
+
+        case 'image':
+          // Standard markdown image: ![alt](url)
+          // If there's a caption, we might lose it in standard markdown unless we use HTML
+          // but for now let's stick to standard markdown
+          const alt = block.data.caption || block.data.file?.name || 'image';
+          const url = block.data.file?.url || '';
+          return `![${alt}](${url})`;
+
+        case 'table':
+          const content = block.data.content || [];
+          if (!content.length) return '';
+
+          const withHeadings = block.data.withHeadings;
+          // Simple table generation
+          return content
+            .map((row: string[], rowIndex: number) => {
+              const rowStr = `| ${row.map(cell => convertHtmlToMarkdown(cell)).join(' | ')} |`;
+              let separator = '';
+              if (withHeadings && rowIndex === 0) {
+                separator = '\n| ' + row.map(() => '---').join(' | ') + ' |';
+              }
+              return rowStr + separator;
+            })
+            .join('\n');
+
+        default:
+          // Fallback for unknown blocks (or text)
+          if (block.data && block.data.text) {
+            return convertHtmlToMarkdown(block.data.text);
+          }
+          return '';
+      }
+    })
+    .join('\n\n');
 }
 
 // Helper to convert MDAST node to Editor.js Block
@@ -115,8 +134,8 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
         type: 'header',
         data: {
           text: serializeChildren(heading.children),
-          level: heading.depth
-        }
+          level: heading.depth,
+        },
       };
 
     case 'paragraph':
@@ -131,15 +150,15 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
             caption: image.alt || '',
             withBorder: false,
             withBackground: false,
-            stretched: false
-          }
+            stretched: false,
+          },
         };
       }
       return {
         type: 'paragraph',
         data: {
-          text: serializeChildren(paragraph.children)
-        }
+          text: serializeChildren(paragraph.children),
+        },
       };
 
     case 'list':
@@ -148,14 +167,14 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
       const isChecklist = list.children.some((item: any) => item.checked !== null);
 
       if (isChecklist) {
-         return {
+        return {
           type: 'checklist',
           data: {
             items: list.children.map((item: any) => ({
               text: serializeChildren(item.children[0]?.children || []), // items usually have a paragraph as first child
-              checked: !!item.checked
-            }))
-          }
+              checked: !!item.checked,
+            })),
+          },
         };
       }
 
@@ -166,8 +185,8 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
           items: list.children.map((item: any) => {
             // Flatten list item children
             return item.children.map((c: any) => serializeChildren([c])).join('');
-          })
-        }
+          }),
+        },
       };
 
     case 'code':
@@ -176,8 +195,8 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
         type: 'code',
         data: {
           code: code.value,
-          language: code.lang
-        }
+          language: code.lang,
+        },
       };
 
     case 'blockquote':
@@ -187,14 +206,14 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
         type: 'quote',
         data: {
           text: quote.children.map((c: any) => serializeChildren(c.children || [])).join('<br>'),
-          alignment: 'left'
-        }
+          alignment: 'left',
+        },
       };
 
     case 'thematicBreak':
       return {
         type: 'delimiter',
-        data: {}
+        data: {},
       };
 
     case 'table':
@@ -206,20 +225,20 @@ async function convertNodeToBlock(node: Content): Promise<OutputBlockData | null
         type: 'table',
         data: {
           withHeadings: true, // Markdown tables always assume first row is header implicitly or explicitly
-          content: rows
-        }
+          content: rows,
+        },
       };
 
     case 'image':
       // Standalone image not in paragraph (rare in mdast but possible)
-       const image = node as any;
-        return {
-          type: 'image',
-          data: {
-            file: { url: image.url },
-            caption: image.alt || '',
-          }
-        };
+      const image = node as any;
+      return {
+        type: 'image',
+        data: {
+          file: { url: image.url },
+          caption: image.alt || '',
+        },
+      };
 
     default:
       console.warn(`Unsupported block type: ${node.type}`);
@@ -260,7 +279,7 @@ function serializeNode(node: any): string {
       return `[Image: ${node.alt}]`;
 
     case 'html':
-        return node.value;
+      return node.value;
 
     default:
       if (node.children) {
@@ -279,10 +298,11 @@ function convertHtmlToMarkdown(html: string): string {
   let md = html;
 
   // Replace HTML entities
-  md = md.replace(/&nbsp;/g, ' ')
-         .replace(/&amp;/g, '&')
-         .replace(/&lt;/g, '<')
-         .replace(/&gt;/g, '>');
+  md = md
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 
   // Bold
   md = md.replace(/<b>(.*?)<\/b>/g, '**$1**');

@@ -26,7 +26,9 @@ interface FileSystemDirectoryHandleWithPermissions extends FileSystemDirectoryHa
 // Extend Window interface for showDirectoryPicker
 declare global {
   interface Window {
-    showDirectoryPicker?(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>;
+    showDirectoryPicker?(options?: {
+      mode?: 'read' | 'readwrite';
+    }): Promise<FileSystemDirectoryHandle>;
   }
 }
 
@@ -47,7 +49,7 @@ async function getDB(): Promise<IDBDatabase> {
     const request = indexedDB.open(IDB_NAME, 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(IDB_STORE)) {
         db.createObjectStore(IDB_STORE);
@@ -87,7 +89,10 @@ async function restoreHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle |
     const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
       const request = store.get('handle');
       request.onsuccess = () => {
-        logger.log('restoreHandleFromIndexedDB: Handle retrieved from IndexedDB:', !!request.result);
+        logger.log(
+          'restoreHandleFromIndexedDB: Handle retrieved from IndexedDB:',
+          !!request.result
+        );
         resolve(request.result || null);
       };
       request.onerror = () => reject(request.error);
@@ -101,9 +106,11 @@ async function restoreHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle |
     logger.log('restoreHandleFromIndexedDB: Handle found, checking permission...');
     // Verify permission is still granted
     const handleWithPerms = handle as FileSystemDirectoryHandleWithPermissions;
-    let permission = handleWithPerms.queryPermission ? await handleWithPerms.queryPermission({ mode: 'readwrite' }) : 'granted';
+    let permission = handleWithPerms.queryPermission
+      ? await handleWithPerms.queryPermission({ mode: 'readwrite' })
+      : 'granted';
     logger.log('restoreHandleFromIndexedDB: Permission state:', permission);
-    
+
     if (permission === 'granted') {
       logger.log('restoreHandleFromIndexedDB: Permission granted, returning handle');
       return handle;
@@ -112,20 +119,27 @@ async function restoreHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle |
       // In some browsers, permission can be in 'prompt' state but still work
       // Try to request it, but don't fail immediately if it doesn't work
       try {
-        permission = handleWithPerms.requestPermission ? await handleWithPerms.requestPermission({ mode: 'readwrite' }) : 'granted';
+        permission = handleWithPerms.requestPermission
+          ? await handleWithPerms.requestPermission({ mode: 'readwrite' })
+          : 'granted';
         logger.log('restoreHandleFromIndexedDB: After requestPermission, state:', permission);
         if (permission === 'granted') {
           return handle;
         }
       } catch (permError) {
         // requestPermission might fail without user gesture - that's okay
-        logger.log('restoreHandleFromIndexedDB: Could not request permission automatically (user gesture may be required):', permError);
+        logger.log(
+          'restoreHandleFromIndexedDB: Could not request permission automatically (user gesture may be required):',
+          permError
+        );
       }
-      
+
       // Permission is 'prompt' - don't return the handle yet
       // The handle exists but needs user gesture to restore permission
       // Returning null so caller knows permission needs to be requested
-      logger.log('restoreHandleFromIndexedDB: Permission is prompt - handle exists but needs user gesture to restore');
+      logger.log(
+        'restoreHandleFromIndexedDB: Permission is prompt - handle exists but needs user gesture to restore'
+      );
       return null; // Return null - caller should request permission with user gesture
     } else {
       // Permission was denied - don't clear the handle, just return null
@@ -135,7 +149,10 @@ async function restoreHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle |
       return null;
     }
   } catch (error) {
-    logger.error('restoreHandleFromIndexedDB: Error restoring directory handle from IndexedDB:', error);
+    logger.error(
+      'restoreHandleFromIndexedDB: Error restoring directory handle from IndexedDB:',
+      error
+    );
     return null;
   }
 }
@@ -192,10 +209,12 @@ export async function hasValidDirectoryAccess(): Promise<boolean> {
   if (!directoryHandle) {
     return false;
   }
-  
+
   try {
     const handleWithPerms = directoryHandle as FileSystemDirectoryHandleWithPermissions;
-    const permission = handleWithPerms.queryPermission ? await handleWithPerms.queryPermission({ mode: 'readwrite' }) : 'granted';
+    const permission = handleWithPerms.queryPermission
+      ? await handleWithPerms.queryPermission({ mode: 'readwrite' })
+      : 'granted';
     return permission === 'granted';
   } catch (error) {
     logger.error('Error checking directory permission:', error);
@@ -216,7 +235,7 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
 
   try {
     logger.log('restoreDirectoryAccess: Attempting to restore handle from IndexedDB...');
-    
+
     // First, try to get handle directly from IndexedDB
     // This is important because we want to keep the handle even if permission check fails
     let handle: FileSystemDirectoryHandle | null = null;
@@ -233,24 +252,26 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
       logger.error('restoreDirectoryAccess: Error reading from IndexedDB:', dbError);
       throw new Error('Could not access stored folder information.');
     }
-    
+
     // If handle doesn't exist in IndexedDB, automatically prompt user to re-select folder
     if (!handle) {
-      logger.log('restoreDirectoryAccess: No handle found in IndexedDB, prompting user to re-select folder...');
+      logger.log(
+        'restoreDirectoryAccess: No handle found in IndexedDB, prompting user to re-select folder...'
+      );
       // Automatically prompt for folder selection
       if (!isFileSystemSupported()) {
         throw new Error('File System Access API is not supported in this browser.');
       }
-      
+
       const newHandle = await (window.showDirectoryPicker?.({
         mode: 'readwrite',
       }) ?? Promise.reject(new Error('showDirectoryPicker not available')));
-      
+
       if (!newHandle) {
         // User cancelled
         return false;
       }
-      
+
       // Set the new handle
       await setDirectoryHandle(newHandle, newHandle.name);
       directoryHandle = newHandle;
@@ -260,17 +281,21 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
 
     // Handle exists - now request permission with user gesture
     logger.log('restoreDirectoryAccess: Handle found, requesting permission with user gesture...');
-    
+
     // First check current permission state
     const handleWithPerms = handle as FileSystemDirectoryHandleWithPermissions;
-    let permission = handleWithPerms.queryPermission ? await handleWithPerms.queryPermission({ mode: 'readwrite' }) : 'granted';
+    let permission = handleWithPerms.queryPermission
+      ? await handleWithPerms.queryPermission({ mode: 'readwrite' })
+      : 'granted';
     logger.log('restoreDirectoryAccess: Initial permission state:', permission);
-    
+
     // If permission is not granted, request it (user gesture available from button click)
     if (permission !== 'granted') {
       logger.log('restoreDirectoryAccess: Requesting permission with user gesture...');
       try {
-        permission = handleWithPerms.requestPermission ? await handleWithPerms.requestPermission({ mode: 'readwrite' }) : 'granted';
+        permission = handleWithPerms.requestPermission
+          ? await handleWithPerms.requestPermission({ mode: 'readwrite' })
+          : 'granted';
         logger.log('restoreDirectoryAccess: Permission after request:', permission);
       } catch (permError: any) {
         logger.error('restoreDirectoryAccess: Error requesting permission:', permError);
@@ -287,7 +312,7 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
       logger.log('restoreDirectoryAccess: Successfully restored access');
       return true;
     }
-    
+
     // If permission is still 'prompt' or we got an error, try to verify access
     // Sometimes browsers allow access even when permission state is 'prompt'
     logger.log('restoreDirectoryAccess: Permission not granted, verifying if handle works...');
@@ -295,7 +320,9 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
       // Try to verify we can access the directory
       const entries: string[] = [];
       // Type assertion for keys() method
-      const handleWithKeys = handle as FileSystemDirectoryHandle & { keys(): AsyncIterableIterator<string> };
+      const handleWithKeys = handle as FileSystemDirectoryHandle & {
+        keys(): AsyncIterableIterator<string>;
+      };
       for await (const entry of handleWithKeys.keys()) {
         entries.push(entry);
         break; // Just check if we can iterate
@@ -311,17 +338,19 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
       // On macOS Chrome, requestPermission might trigger folder picker instead of permission dialog
       // So we need to let user re-select the folder
       // Since we know the folder path, we can guide them to select the same folder
-      logger.log('restoreDirectoryAccess: Access failed, prompting user to re-select folder (same folder is fine)');
-      
+      logger.log(
+        'restoreDirectoryAccess: Access failed, prompting user to re-select folder (same folder is fine)'
+      );
+
       // Prompt user to select folder - they should select the same one
       const newHandle = await (window.showDirectoryPicker?.({
         mode: 'readwrite',
       }) ?? Promise.reject(new Error('showDirectoryPicker not available')));
-      
+
       if (!newHandle) {
         return false;
       }
-      
+
       // Set the new handle (even if it's the same folder)
       await setDirectoryHandle(newHandle, newHandle.name);
       directoryHandle = newHandle;
@@ -346,7 +375,10 @@ export async function restoreDirectoryAccess(): Promise<boolean> {
  * @param defaultName - Suggested default directory name
  * @param allowReuse - If true and folder is configured, try to restore handle first
  */
-export async function requestDirectoryAccess(_defaultName: string = 'Pinn', allowReuse: boolean = false): Promise<FileSystemDirectoryHandle | null> {
+export async function requestDirectoryAccess(
+  _defaultName: string = 'Pinn',
+  allowReuse: boolean = false
+): Promise<FileSystemDirectoryHandle | null> {
   try {
     if (!isFileSystemSupported()) {
       throw new Error('File System Access API is not supported in this browser');
@@ -360,9 +392,13 @@ export async function requestDirectoryAccess(_defaultName: string = 'Pinn', allo
         // Verify we can still access it
         try {
           const restoredWithPerms = restored as FileSystemDirectoryHandleWithPermissions;
-          let permission = restoredWithPerms.queryPermission ? await restoredWithPerms.queryPermission({ mode: 'readwrite' }) : 'granted';
+          let permission = restoredWithPerms.queryPermission
+            ? await restoredWithPerms.queryPermission({ mode: 'readwrite' })
+            : 'granted';
           if (permission === 'prompt') {
-            permission = restoredWithPerms.requestPermission ? await restoredWithPerms.requestPermission({ mode: 'readwrite' }) : 'granted';
+            permission = restoredWithPerms.requestPermission
+              ? await restoredWithPerms.requestPermission({ mode: 'readwrite' })
+              : 'granted';
           }
           if (permission === 'granted') {
             directoryHandle = restored;
@@ -370,7 +406,9 @@ export async function requestDirectoryAccess(_defaultName: string = 'Pinn', allo
             return restored;
           }
         } catch (permError) {
-          logger.log('requestDirectoryAccess: Could not restore handle, will prompt for new selection');
+          logger.log(
+            'requestDirectoryAccess: Could not restore handle, will prompt for new selection'
+          );
         }
       }
     }
@@ -406,7 +444,10 @@ export async function requestDirectoryAccess(_defaultName: string = 'Pinn', allo
 /**
  * Set the directory handle (used after onboarding)
  */
-export async function setDirectoryHandle(handle: FileSystemDirectoryHandle, pathName?: string): Promise<void> {
+export async function setDirectoryHandle(
+  handle: FileSystemDirectoryHandle,
+  pathName?: string
+): Promise<void> {
   directoryHandle = handle;
   localStorage.setItem(FOLDER_CONFIGURED_KEY, 'true');
   if (pathName) {
@@ -477,18 +518,25 @@ export async function initializeDirectoryHandle(): Promise<void> {
 
   isRestoringHandle = true;
   logger.log('initializeDirectoryHandle: Starting handle restoration...');
-  
+
   try {
     const handle = await restoreHandleFromIndexedDB();
     if (handle) {
       directoryHandle = handle;
-      logger.log('initializeDirectoryHandle: Directory handle restored from IndexedDB, access available:', hasDirectoryAccess());
+      logger.log(
+        'initializeDirectoryHandle: Directory handle restored from IndexedDB, access available:',
+        hasDirectoryAccess()
+      );
     } else {
-      logger.warn('initializeDirectoryHandle: Failed to restore directory handle - permission may need to be re-granted');
+      logger.warn(
+        'initializeDirectoryHandle: Failed to restore directory handle - permission may need to be re-granted'
+      );
       // Keep the folder configured flag - don't clear it
       // The folder is still configured, just permission needs to be re-granted
       // User can re-grant permission when they try to use file operations
-      logger.log('initializeDirectoryHandle: Folder remains configured, but handle needs to be restored with user permission');
+      logger.log(
+        'initializeDirectoryHandle: Folder remains configured, but handle needs to be restored with user permission'
+      );
     }
   } catch (error) {
     logger.error('initializeDirectoryHandle: Error initializing directory handle:', error);
@@ -509,15 +557,21 @@ export async function ensureDirectoryAccess(): Promise<FileSystemDirectoryHandle
   if (!directoryHandle) {
     // If folder is configured but handle is missing, try to restore it
     if (isFolderConfigured()) {
-      logger.log('ensureDirectoryAccess: Folder configured but handle missing, attempting to restore...');
+      logger.log(
+        'ensureDirectoryAccess: Folder configured but handle missing, attempting to restore...'
+      );
       const restored = await restoreHandleFromIndexedDB();
       if (restored) {
         // Try to request permission if needed
         try {
           const restoredWithPerms = restored as FileSystemDirectoryHandleWithPermissions;
-          let permission = restoredWithPerms.queryPermission ? await restoredWithPerms.queryPermission({ mode: 'readwrite' }) : 'granted';
+          let permission = restoredWithPerms.queryPermission
+            ? await restoredWithPerms.queryPermission({ mode: 'readwrite' })
+            : 'granted';
           if (permission === 'prompt') {
-            permission = restoredWithPerms.requestPermission ? await restoredWithPerms.requestPermission({ mode: 'readwrite' }) : 'granted';
+            permission = restoredWithPerms.requestPermission
+              ? await restoredWithPerms.requestPermission({ mode: 'readwrite' })
+              : 'granted';
           }
           if (permission === 'granted') {
             directoryHandle = restored;
@@ -528,9 +582,11 @@ export async function ensureDirectoryAccess(): Promise<FileSystemDirectoryHandle
           logger.error('ensureDirectoryAccess: Could not restore permission:', permError);
         }
       }
-      throw new Error('Directory access was revoked. Please re-select your folder in settings to continue using file system storage.');
+      throw new Error(
+        'Directory access was revoked. Please re-select your folder in settings to continue using file system storage.'
+      );
     } else {
-    throw new Error('No directory selected. Please select a folder in settings.');
+      throw new Error('No directory selected. Please select a folder in settings.');
     }
   }
   return directoryHandle;
@@ -582,7 +638,6 @@ async function writeJSONFile(filename: string, data: any): Promise<void> {
   }
 }
 
-
 // ============================================================================
 // NEW FILE STRUCTURE FUNCTIONS
 // ============================================================================
@@ -605,7 +660,7 @@ export async function ensureNotesDirectory(): Promise<FileSystemDirectoryHandle>
  */
 export async function ensureNotesFolder(folderPath: string): Promise<FileSystemDirectoryHandle> {
   const notesDir = await ensureNotesDirectory();
-  
+
   if (!folderPath || folderPath.trim() === '') {
     // Return unfiled directory
     return await notesDir.getDirectoryHandle('unfiled', { create: true });
@@ -674,12 +729,20 @@ let cachedNotesIndex: NotesIndex | null = null;
 /**
  * Read notes index from notes-index.json
  */
-export async function readNotesIndex(): Promise<NotesIndex | null> {
-  // Return cached index if available
-  if (cachedNotesIndex) {
-    return cachedNotesIndex;
-  }
 
+export async function readNotesIndex(): Promise<{
+  version: string;
+  lastUpdated: string;
+  notes: Array<{
+    id: string;
+    title: string;
+    folder?: string;
+    filePath: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  folders?: string[];
+} | null> {
   try {
     const notesDir = await ensureNotesDirectory();
     const fileHandle = await notesDir.getFileHandle('notes-index.json', { create: false });
@@ -703,12 +766,34 @@ export async function readNotesIndex(): Promise<NotesIndex | null> {
 /**
  * Write notes index to notes-index.json
  */
-export async function writeNotesIndex(notes: NoteIndexEntry[]): Promise<void> {
+export async function writeNotesIndex(
+  notes: Array<{
+    id: string;
+    title: string;
+    folder?: string;
+    filePath: string;
+    created_at: string;
+    updated_at: string;
+  }>,
+  folders?: string[]
+): Promise<void> {
   try {
-    const indexData: NotesIndex = {
+    const notesDir = await ensureNotesDirectory();
+    const fileHandle = await notesDir.getFileHandle('notes-index.json', { create: true });
+    const writable = await fileHandle.createWritable();
+
+    // Get existing index to preserve folders if not provided
+    let existingFolders: string[] = [];
+    if (!folders) {
+      const existing = await readNotesIndex();
+      existingFolders = existing?.folders || [];
+    }
+
+    const indexData = {
       version: '1.0',
       lastUpdated: new Date().toISOString(),
       notes,
+      folders: folders || existingFolders,
     };
 
     // Update cache immediately to prevent race conditions
@@ -810,7 +895,7 @@ export async function writeNoteToFile(note: {
     // Check if note already exists in index to get current file path
     const index = await readNotesIndex();
     const existingNote = index?.notes.find(n => n.id === note.id);
-    
+
     // If note exists and is in a different folder, we need to move it
     if (existingNote && existingNote.filePath) {
       const oldPathParts = existingNote.filePath.split('/');
@@ -826,7 +911,9 @@ export async function writeNoteToFile(note: {
           let oldDirHandle = notesDir;
           if (oldPathParts.length > 1) {
             for (let i = 0; i < oldPathParts.length - 1; i++) {
-              oldDirHandle = await oldDirHandle.getDirectoryHandle(oldPathParts[i], { create: false });
+              oldDirHandle = await oldDirHandle.getDirectoryHandle(oldPathParts[i], {
+                create: false,
+              });
             }
           }
           await oldDirHandle.removeEntry(oldFilename, { recursive: false });
@@ -860,8 +947,6 @@ export async function writeNoteToFile(note: {
       const oldPathParts = existingNote.filePath.split('/');
       const oldFilename = oldPathParts[oldPathParts.length - 1];
       const oldSlug = oldFilename.replace(/\.md$/, '');
-
-      const newBaseSlug = createSlugFromTitle(note.title);
 
       // If the slug generated from the current title matches the old slug (ignoring uniqueness suffixes potentially),
       // or if we just want to be safe: check if the old filename still exists.
@@ -1082,6 +1167,7 @@ export async function rebuildNotesIndex(): Promise<void> {
       created_at: string;
       updated_at: string;
     }> = [];
+    const folders = new Set<string>();
 
     // Recursively scan directories
     async function scanDirectory(
@@ -1113,9 +1199,14 @@ export async function rebuildNotesIndex(): Promise<void> {
           } catch (error) {
             logger.warn(`Error reading file ${entry.name}:`, error);
           }
-        } else if (entry.kind === 'directory' && entry.name !== 'trash') {
-          // Skip trash directory
+        } else if (
+          entry.kind === 'directory' &&
+          entry.name !== 'trash' &&
+          entry.name !== 'unfiled'
+        ) {
+          // Skip trash and unfiled directory (unfiled is internal organization, not a user folder)
           const newFolderPath = folderPath ? `${folderPath}/${entry.name}` : entry.name;
+          folders.add(newFolderPath);
           const subDirHandle = await dirHandle.getDirectoryHandle(entry.name, { create: false });
           await scanDirectory(subDirHandle, newFolderPath);
         }
@@ -1123,8 +1214,8 @@ export async function rebuildNotesIndex(): Promise<void> {
     }
 
     await scanDirectory(notesDir);
-    await writeNotesIndex(notes);
-    logger.log(`Rebuilt notes index with ${notes.length} notes`);
+    await writeNotesIndex(notes, Array.from(folders).sort());
+    logger.log(`Rebuilt notes index with ${notes.length} notes and ${folders.size} folders`);
   } catch (error) {
     logger.error('Error rebuilding notes index:', error);
     throw error;
@@ -1135,14 +1226,16 @@ export async function rebuildNotesIndex(): Promise<void> {
  * Read all notes from the new file structure
  * Uses index for fast loading - only loads metadata, not content
  */
-export async function readAllNotesFromDirectory(loadContent: boolean = false): Promise<Array<{
-  id: string;
-  title: string;
-  content: string;
-  folder?: string;
-  created_at: string;
-  updated_at: string;
-}>> {
+export async function readAllNotesFromDirectory(loadContent: boolean = false): Promise<
+  Array<{
+    id: string;
+    title: string;
+    content: string;
+    folder?: string;
+    created_at: string;
+    updated_at: string;
+  }>
+> {
   try {
     const index = await readNotesIndex();
     if (!index || !index.notes || index.notes.length === 0) {
@@ -1208,7 +1301,7 @@ export async function ensureFlowsDirectory(): Promise<FileSystemDirectoryHandle>
 export async function readFlowFromFile(flowId: string): Promise<any | null> {
   try {
     const flowsDir = await ensureFlowsDirectory();
-    
+
     // We need to search for the file by reading all files
     // Since we're using title-based slugs, we need to check each file
     const flowsDirWithValues = flowsDir as FileSystemDirectoryHandle & {
@@ -1250,10 +1343,10 @@ export async function writeFlowToFile(flow: {
 }): Promise<void> {
   try {
     const flowsDir = await ensureFlowsDirectory();
-    
+
     // Get existing slugs
     const existingSlugs = await getExistingSlugsInDirectory(flowsDir);
-    
+
     // Check if flow already exists
     const existingFlow = await readFlowFromFile(flow.id);
     if (existingFlow) {
@@ -1313,7 +1406,7 @@ export async function writeFlowToFile(flow: {
 export async function deleteFlowFile(flowId: string): Promise<void> {
   try {
     const flowsDir = await ensureFlowsDirectory();
-    
+
     // Find and delete the file
     const flowsDirWithValues = flowsDir as FileSystemDirectoryHandle & {
       values(): AsyncIterableIterator<FileSystemHandle>;
@@ -1390,10 +1483,15 @@ export async function readCategoriesFromFile(): Promise<string[]> {
       return [];
     }
     if (!Array.isArray(data)) {
-      logger.warn('flowCategories.json contains invalid data (not an array), returning empty array');
+      logger.warn(
+        'flowCategories.json contains invalid data (not an array), returning empty array'
+      );
       return [];
     }
-    const categories = data.filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean);
+    const categories = data
+      .filter(x => typeof x === 'string')
+      .map(x => x.trim())
+      .filter(Boolean);
     logger.log(`Loaded ${categories.length} categories from flowCategories.json`);
     return categories;
   } catch (error) {
@@ -1403,8 +1501,40 @@ export async function readCategoriesFromFile(): Promise<string[]> {
 }
 
 export async function writeCategoriesToFile(categories: string[]): Promise<void> {
-  const unique = Array.from(new Set(categories.map((c) => (c || '').trim()).filter(Boolean)));
+  const unique = Array.from(new Set(categories.map(c => (c || '').trim()).filter(Boolean)));
   await writeJSONFile('flowCategories.json', unique);
 }
 
+/**
+ * Get folders from index
+ */
+export async function getFoldersFromIndex(): Promise<string[]> {
+  const index = await readNotesIndex();
+  return index?.folders || [];
+}
 
+/**
+ * Create a folder in the file system and update index
+ */
+export async function createFolderInFileSystem(name: string): Promise<void> {
+  const folderName = (name || '').trim();
+  if (!folderName) return;
+
+  try {
+    // 1. Create directory
+    await ensureNotesFolder(folderName);
+
+    // 2. Update index
+    const index = await readNotesIndex();
+    const notes = index?.notes || [];
+    const currentFolders = new Set(index?.folders || []);
+
+    if (!currentFolders.has(folderName)) {
+      currentFolders.add(folderName);
+      await writeNotesIndex(notes, Array.from(currentFolders).sort());
+    }
+  } catch (error) {
+    logger.error('Error creating folder in file system:', error);
+    throw error;
+  }
+}

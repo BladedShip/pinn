@@ -29,13 +29,13 @@ function Dashboard() {
     const flows = getFlows() || [];
 
     // Sort by updated_at and take top 5
-    const sortedNotes = [...notes].sort((a, b) =>
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    ).slice(0, 5);
+    const sortedNotes = [...notes]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 5);
 
-    const sortedFlows = [...flows].sort((a, b) =>
-      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    ).slice(0, 5);
+    const sortedFlows = [...flows]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 5);
 
     setRecentNotes(sortedNotes);
     setRecentFlows(sortedFlows);
@@ -70,14 +70,19 @@ function Dashboard() {
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Book className="h-5 w-5 text-muted-foreground" /> Recent Notes
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/notes' })} className="text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: '/notes' })}
+              className="text-muted-foreground hover:text-foreground"
+            >
               View All <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
 
           {recentNotes.length > 0 ? (
             <div className="grid gap-3">
-              {recentNotes.map((note) => (
+              {recentNotes.map(note => (
                 <Card
                   key={note.id}
                   className="hover:bg-accent/50 transition-colors cursor-pointer border-border"
@@ -102,7 +107,12 @@ function Dashboard() {
               <CardContent className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
                 <Book className="h-8 w-8 opacity-50" />
                 <p>No notes yet. Start capturing your thoughts.</p>
-                <Button variant="outline" size="sm" onClick={() => navigate({ to: '/note/new' })} className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate({ to: '/note/new' })}
+                  className="mt-2"
+                >
                   Create First Note
                 </Button>
               </CardContent>
@@ -116,14 +126,19 @@ function Dashboard() {
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <GitBranch className="h-5 w-5 text-muted-foreground" /> Recent Flows
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/flows' })} className="text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: '/flows' })}
+              className="text-muted-foreground hover:text-foreground"
+            >
               View All <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
 
           {recentFlows.length > 0 ? (
             <div className="grid gap-3">
-              {recentFlows.map((flow) => (
+              {recentFlows.map(flow => (
                 <Card
                   key={flow.id}
                   className="hover:bg-accent/50 transition-colors cursor-pointer border-border"
@@ -134,7 +149,10 @@ function Dashboard() {
                       <h3 className="font-medium truncate">{flow.title || 'Untitled Flow'}</h3>
                       <div className="flex gap-2 mt-1">
                         {flow.tags?.slice(0, 3).map((tag: string) => (
-                          <span key={tag} className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground">
+                          <span
+                            key={tag}
+                            className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground"
+                          >
                             {tag}
                           </span>
                         ))}

@@ -4,7 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { Bookmark, Folder, X, AlertCircle, Check } from 'lucide-react';
 import OnboardingDialog from '../components/OnboardingDialog';
 import LoadingScreen from '../components/LoadingScreen';
-import { isFolderConfigured, initializeDirectoryHandle, hasDirectoryAccess, hasValidDirectoryAccess, restoreDirectoryAccess, getFolderPath } from '../lib/fileSystemStorage';
+import {
+  isFolderConfigured,
+  initializeDirectoryHandle,
+  hasDirectoryAccess,
+  hasValidDirectoryAccess,
+  restoreDirectoryAccess,
+  getFolderPath,
+} from '../lib/fileSystemStorage';
 import { initStorage, refreshStorage } from '../lib/storage';
 import { initFlowStorage, refreshFlowStorage } from '../lib/flowStorage';
 import { initializeTheme, applyTheme } from '../lib/themeStorage';
@@ -28,11 +35,13 @@ function RootComponent() {
   // Detect mobile devices
   useEffect(() => {
     const checkMobile = () => {
-      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                             window.innerWidth < 768;
+      const isMobileDevice =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        ) || window.innerWidth < 768;
       setIsMobile(isMobileDevice);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -43,49 +52,49 @@ function RootComponent() {
     const initialize = async () => {
       try {
         logger.log('App initialization started');
-        
+
         // Step 1: Initialize and apply theme
         setLoadingStep('theme');
         setLoadingSubMessage('Initializing theme');
         const theme = await initializeTheme();
         applyTheme(theme);
         logger.log('Theme initialized:', theme);
-        
+
         // Step 2: Check folder configuration and restore directory handle
         setLoadingStep('folder-check');
         setLoadingSubMessage('Checking folder access');
         const folderConfigured = isFolderConfigured();
         logger.log('Folder configured check:', folderConfigured);
-        
+
         setLoadingSubMessage('Restoring folder access');
         await initializeDirectoryHandle();
         const handleAvailable = hasDirectoryAccess();
         logger.log('Directory handle initialization completed, handle available:', handleAvailable);
-        
+
         // Give a tiny delay to ensure handle is fully set
         await new Promise(resolve => setTimeout(resolve, 10));
-        
+
         // Check if we have valid access (handle exists AND permission is granted)
         const hasValidAccess = handleAvailable ? await hasValidDirectoryAccess() : false;
         logger.log('Valid directory access check:', hasValidAccess);
-        
+
         // Step 3: Initialize storage (load from index)
         setLoadingStep('notes-index');
         setLoadingSubMessage('Loading notes index');
         await initStorage();
-        
+
         // Step 4: Initialize flows
         setLoadingStep('flows');
         setLoadingSubMessage('Loading flows');
         await initFlowStorage();
-        
+
         // Step 5: Ready
         setLoadingStep('ready');
         setLoadingSubMessage('Finalizing');
         await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for smooth transition
-        
+
         logger.log('Storage initialization completed');
-        
+
         // Only show onboarding if folder was never configured
         // If folder is configured but handle is missing, we'll let the user use the app
         // and they can re-grant permission when needed
@@ -124,7 +133,7 @@ function RootComponent() {
       const checkAccess = async () => {
         const folderConfigured = isFolderConfigured();
         const hasAccess = hasDirectoryAccess();
-        
+
         if (!folderConfigured && !isMobile) {
           // Folder was removed, show onboarding
           setShowOnboarding(true);
@@ -140,7 +149,7 @@ function RootComponent() {
           }
         }
       };
-      
+
       checkAccess();
     }
   }, [isInitializing, showOnboarding, isMobile]);
@@ -156,7 +165,7 @@ function RootComponent() {
         await refreshStorage();
         await refreshFlowStorage();
         setNeedsPermissionRestore(false);
-        
+
         // Trigger a storage refresh event so all components reload their data
         window.dispatchEvent(new CustomEvent('storage-refresh'));
       } else {
@@ -192,7 +201,8 @@ function RootComponent() {
             Desktop Experience Required
           </h2>
           <p className="text-sm sm:text-base text-theme-text-secondary mb-5 sm:mb-6 leading-relaxed">
-            This application is optimized for desktop use. Please access it from a desktop or laptop for the best experience.
+            This application is optimized for desktop use. Please access it from a desktop or laptop
+            for the best experience.
           </p>
           <div className="space-y-3.5 sm:space-y-4 pt-4 border-t border-theme-border-light">
             <div className="flex items-start gap-3.5 text-left">
@@ -228,7 +238,7 @@ function RootComponent() {
   const folderPath = getFolderPath();
 
   return (
-    <div className="min-h-screen bg-theme-bg-primary text-theme-text-secondary">
+    <div className="h-screen overflow-hidden bg-theme-bg-primary text-theme-text-secondary">
       {showOnboarding ? (
         <OnboardingDialog onComplete={handleOnboardingComplete} />
       ) : (
@@ -246,7 +256,9 @@ function RootComponent() {
                       Folder access needs to be restored
                     </p>
                     <p className="text-xs text-theme-text-secondary truncate">
-                      {folderPath ? `Your folder "${folderPath}" is configured. Click to restore access (you may need to select the same folder again).` : 'Your folder is configured. Click to restore access (you may need to select the same folder again).'}
+                      {folderPath
+                        ? `Your folder "${folderPath}" is configured. Click to restore access (you may need to select the same folder again).`
+                        : 'Your folder is configured. Click to restore access (you may need to select the same folder again).'}
                     </p>
                   </div>
                 </div>
@@ -291,4 +303,3 @@ function RootComponent() {
     </div>
   );
 }
-

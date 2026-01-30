@@ -1,8 +1,4 @@
-import { 
-  isFolderConfigured, 
-  hasDirectoryAccess,
-  getDirectoryHandle 
-} from './fileSystemStorage';
+import { isFolderConfigured, hasDirectoryAccess, getDirectoryHandle } from './fileSystemStorage';
 import { logger } from '../utils/logger';
 
 const GEMINI_API_KEY_STORAGE_KEY = 'pinn.gemini_api_key';
@@ -98,4 +94,3 @@ export async function deleteGeminiApiKey(): Promise<void> {
     logger.error('Error deleting Gemini API key:', error);
   }
 }
-

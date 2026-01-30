@@ -33,13 +33,13 @@ export default function AIComparisonDialog({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onReject}
     >
-      <div 
+      <div
         className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-4xl border border-theme-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-5 border-b border-theme-border">
           <div className="flex items-center justify-between">
@@ -64,10 +64,15 @@ export default function AIComparisonDialog({
             <div className="flex flex-col">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                <label className="text-sm font-medium text-theme-text-secondary uppercase tracking-wide">Original Text</label>
+                <label className="text-sm font-medium text-theme-text-secondary uppercase tracking-wide">
+                  Original Text
+                </label>
               </div>
               <div className="flex-1 bg-theme-bg-darkest border border-red-500/30 rounded-lg p-4 max-h-64 overflow-y-auto comparison-scroll">
-                <pre className="text-sm text-theme-text-primary whitespace-pre-wrap font-mono leading-relaxed" style={{ margin: 0 }}>
+                <pre
+                  className="text-sm text-theme-text-primary whitespace-pre-wrap font-mono leading-relaxed"
+                  style={{ margin: 0 }}
+                >
                   {oldText}
                 </pre>
               </div>
@@ -95,13 +100,16 @@ export default function AIComparisonDialog({
               {isEditing ? (
                 <textarea
                   value={editedText}
-                  onChange={(e) => setEditedText(e.target.value)}
+                  onChange={e => setEditedText(e.target.value)}
                   className="flex-1 bg-theme-bg-darkest border border-green-500/30 rounded-lg p-4 max-h-64 text-sm text-theme-text-primary font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-[#6366F1] focus:border-transparent comparison-scroll"
                   autoFocus
                 />
               ) : (
                 <div className="flex-1 bg-theme-bg-darkest border border-green-500/30 rounded-lg p-4 max-h-64 overflow-y-auto comparison-scroll">
-                  <pre className="text-sm text-theme-text-primary whitespace-pre-wrap font-mono leading-relaxed" style={{ margin: 0 }}>
+                  <pre
+                    className="text-sm text-theme-text-primary whitespace-pre-wrap font-mono leading-relaxed"
+                    style={{ margin: 0 }}
+                  >
                     {editedText}
                   </pre>
                 </div>
@@ -159,4 +167,3 @@ export default function AIComparisonDialog({
     </div>
   );
 }
-

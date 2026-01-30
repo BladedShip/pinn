@@ -131,7 +131,10 @@ async function writeTrashIndex(index: TrashIndex): Promise<void> {
         await writable.write(JSON.stringify(index, null, 2));
         await writable.close();
       } catch (error) {
-        logger.error('Error writing trash index to file system, falling back to localStorage:', error);
+        logger.error(
+          'Error writing trash index to file system, falling back to localStorage:',
+          error
+        );
         // Fallback to localStorage
         writeTrashIndexLocalStorage(index);
       }
@@ -171,7 +174,7 @@ export async function moveNoteToTrashLocalStorage(note: Note): Promise<void> {
     // Store note content in localStorage
     const itemKey = `${TRASH_ITEM_PREFIX}${note.id}`;
     localStorage.setItem(itemKey, JSON.stringify(note));
-    
+
     // Update trash index
     const trashIndex = readTrashIndexLocalStorage();
     const trashItem: TrashedItem = {
@@ -188,11 +191,11 @@ export async function moveNoteToTrashLocalStorage(note: Note): Promise<void> {
         updated_at: note.updated_at,
       },
     };
-    
+
     trashIndex.items.push(trashItem);
     trashIndex.lastUpdated = new Date().toISOString();
     writeTrashIndexLocalStorage(trashIndex);
-    
+
     logger.log(`Moved note ${note.id} to trash (localStorage)`);
   } catch (error) {
     logger.error(`Error moving note ${note.id} to trash (localStorage):`, error);
@@ -211,7 +214,7 @@ export async function moveNoteToTrash(noteId: string, originalFolder?: string): 
   let trashFileHandle: FileSystemFileHandle | null = null;
   let dirHandle: FileSystemDirectoryHandle | null = null;
   let filename: string | null = null;
-  
+
   try {
     if (!isFolderConfigured() || !hasDirectoryAccess()) {
       throw new Error('File system not configured');
@@ -228,7 +231,7 @@ export async function moveNoteToTrash(noteId: string, originalFolder?: string): 
     if (!notesIndex) {
       throw new Error('Notes index not found');
     }
-    
+
     noteEntry = notesIndex.notes.find((n: any) => n.id === noteId);
     if (!noteEntry) {
       throw new Error(`Note ${noteId} not found in index, cannot move to trash`);
@@ -237,30 +240,30 @@ export async function moveNoteToTrash(noteId: string, originalFolder?: string): 
     // Step 3: Read file content (before any modifications)
     const notesDir = await ensureNotesDirectory();
     const trashNotesDir = await ensureTrashSubdirectory('notes');
-    
+
     const pathParts = noteEntry.filePath.split('/');
     filename = pathParts[pathParts.length - 1];
-    
+
     if (!filename) {
       throw new Error(`Invalid file path for note ${noteId}: ${noteEntry.filePath}`);
     }
-    
+
     dirHandle = notesDir;
     if (pathParts.length > 1) {
       for (let i = 0; i < pathParts.length - 1; i++) {
         dirHandle = await dirHandle.getDirectoryHandle(pathParts[i], { create: false });
       }
     }
-    
+
     const sourceFile = await dirHandle.getFileHandle(filename, { create: false });
     sourceFileContent = await (await sourceFile.getFile()).text();
-    
+
     // Step 4: Write to trash first (before deleting original)
     trashFileHandle = await trashNotesDir.getFileHandle(filename, { create: true });
     const writable = await trashFileHandle.createWritable();
     await writable.write(sourceFileContent);
     await writable.close();
-    
+
     // Step 5: Update trash index (before deleting original)
     const trashIndex = await readTrashIndex();
     const trashItem: TrashedItem = {
@@ -277,22 +280,22 @@ export async function moveNoteToTrash(noteId: string, originalFolder?: string): 
         updated_at: note.updated_at,
       },
     };
-    
+
     trashIndex.items.push(trashItem);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     // Step 6: Delete from original location (only after trash is confirmed)
     await dirHandle.removeEntry(filename, { recursive: false });
-    
+
     // Step 7: Update notes index (last step)
     const updatedNotes = notesIndex.notes.filter((n: any) => n.id !== noteId);
     await writeNotesIndex(updatedNotes);
-    
+
     logger.log(`Moved note ${noteId} to trash`);
   } catch (error) {
     logger.error(`Error moving note ${noteId} to trash:`, error);
-    
+
     // If we created a trash file but failed later, try to clean it up
     if (trashFileHandle && filename) {
       try {
@@ -303,7 +306,7 @@ export async function moveNoteToTrash(noteId: string, originalFolder?: string): 
         logger.error(`Error cleaning up trash file for ${noteId}:`, cleanupError);
       }
     }
-    
+
     throw error;
   }
 }
@@ -328,11 +331,11 @@ export async function moveFlowToTrash(flowId: string, originalCategory?: string)
     // Find flow file in flows directory
     const flowsDir = await ensureFlowsDirectory();
     const trashFlowsDir = await ensureTrashSubdirectory('flows');
-    
+
     const flowsDirWithValues = flowsDir as FileSystemDirectoryHandle & {
       values(): AsyncIterableIterator<FileSystemHandle>;
     };
-    
+
     let filename: string | null = null;
     for await (const entry of flowsDirWithValues.values()) {
       if (entry.kind === 'file' && entry.name.endsWith('.json')) {
@@ -350,25 +353,25 @@ export async function moveFlowToTrash(flowId: string, originalCategory?: string)
         }
       }
     }
-    
+
     if (!filename) {
       logger.warn(`Flow ${flowId} file not found, cannot move to trash`);
       return;
     }
-    
+
     // Read file content
     const sourceFile = await flowsDir.getFileHandle(filename, { create: false });
     const sourceFileContent = await (await sourceFile.getFile()).text();
-    
+
     // Write to trash
     const trashFileHandle = await trashFlowsDir.getFileHandle(filename, { create: true });
     const writable = await trashFileHandle.createWritable();
     await writable.write(sourceFileContent);
     await writable.close();
-    
+
     // Delete from original location
     await flowsDir.removeEntry(filename, { recursive: false });
-    
+
     // Update trash index
     const trashIndex = await readTrashIndex();
     const trashItem: TrashedItem = {
@@ -381,11 +384,11 @@ export async function moveFlowToTrash(flowId: string, originalCategory?: string)
       deletedAt: new Date().toISOString(),
       metadata: flow,
     };
-    
+
     trashIndex.items.push(trashItem);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Moved flow ${flowId} to trash`);
   } catch (error) {
     logger.error(`Error moving flow ${flowId} to trash:`, error);
@@ -410,7 +413,7 @@ export async function moveFolderToTrash(folderName: string, notesInFolder: Note[
         await moveNoteToTrashLocalStorage(note);
       }
     }
-    
+
     // Add folder metadata to trash index
     const trashIndex = await readTrashIndex();
     const folderItem: TrashedItem = {
@@ -418,20 +421,21 @@ export async function moveFolderToTrash(folderName: string, notesInFolder: Note[
       type: 'folder',
       title: folderName,
       originalPath: `notes/${normalizeFolderPath(folderName)}`,
-      trashPath: isFolderConfigured() && hasDirectoryAccess() 
-        ? `trash/folders/${folderName}` 
-        : `localStorage:folder-${folderName}`,
+      trashPath:
+        isFolderConfigured() && hasDirectoryAccess()
+          ? `trash/folders/${folderName}`
+          : `localStorage:folder-${folderName}`,
       deletedAt: new Date().toISOString(),
       metadata: {
         noteIds: notesInFolder.map(n => n.id),
         noteCount: notesInFolder.length,
       },
     };
-    
+
     trashIndex.items.push(folderItem);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Moved folder ${folderName} to trash (${notesInFolder.length} notes)`);
   } catch (error) {
     logger.error(`Error moving folder ${folderName} to trash:`, error);
@@ -442,7 +446,10 @@ export async function moveFolderToTrash(folderName: string, notesInFolder: Note[
 /**
  * Move a category to trash (moves all flows in category)
  */
-export async function moveCategoryToTrash(categoryName: string, flowsInCategory: Flow[]): Promise<void> {
+export async function moveCategoryToTrash(
+  categoryName: string,
+  flowsInCategory: Flow[]
+): Promise<void> {
   try {
     if (!isFolderConfigured() || !hasDirectoryAccess()) {
       logger.warn('Cannot move category to trash: file system not configured');
@@ -453,7 +460,7 @@ export async function moveCategoryToTrash(categoryName: string, flowsInCategory:
     for (const flow of flowsInCategory) {
       await moveFlowToTrash(flow.id, categoryName);
     }
-    
+
     // Add category metadata to trash index
     const trashIndex = await readTrashIndex();
     const categoryItem: TrashedItem = {
@@ -468,11 +475,11 @@ export async function moveCategoryToTrash(categoryName: string, flowsInCategory:
         flowCount: flowsInCategory.length,
       },
     };
-    
+
     trashIndex.items.push(categoryItem);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Moved category ${categoryName} to trash (${flowsInCategory.length} flows)`);
   } catch (error) {
     logger.error(`Error moving category ${categoryName} to trash:`, error);
@@ -487,7 +494,7 @@ export async function restoreNoteFromTrash(noteId: string): Promise<void> {
   try {
     const trashIndex = await readTrashIndex();
     const trashItem = trashIndex.items.find(item => item.id === noteId && item.type === 'note');
-    
+
     if (!trashItem) {
       logger.warn(`Note ${noteId} not found in trash`);
       return;
@@ -503,11 +510,11 @@ export async function restoreNoteFromTrash(noteId: string): Promise<void> {
         throw new Error(`Note ${noteId} not found in localStorage trash`);
       }
       note = JSON.parse(noteData) as Note;
-      
+
       // Restore to localStorage storage
       const { saveNoteAsync } = await import('./storage');
       await saveNoteAsync(note);
-      
+
       // Delete from localStorage trash
       localStorage.removeItem(itemKey);
     } else {
@@ -520,18 +527,18 @@ export async function restoreNoteFromTrash(noteId: string): Promise<void> {
       const trashNotesDir = await ensureTrashSubdirectory('notes');
       const pathParts = trashItem.trashPath.split('/');
       const filename = pathParts[pathParts.length - 1];
-      
+
       const trashFile = await trashNotesDir.getFileHandle(filename, { create: false });
       const fileContent = await (await trashFile.getFile()).text();
-      
+
       // Parse markdown with frontmatter to get note data
       const { parseMarkdownWithFrontmatter } = await import('./markdownUtils');
       const { metadata, content } = parseMarkdownWithFrontmatter(fileContent);
-      
+
       if (!metadata) {
         throw new Error('Invalid note format in trash');
       }
-      
+
       // Restore to original location
       note = {
         id: metadata.id || '',
@@ -541,18 +548,18 @@ export async function restoreNoteFromTrash(noteId: string): Promise<void> {
         created_at: metadata.created_at || new Date().toISOString(),
         updated_at: metadata.updated_at || new Date().toISOString(),
       };
-      
+
       await writeNoteToFile(note);
-      
+
       // Delete from trash
       await trashNotesDir.removeEntry(filename, { recursive: false });
     }
-    
+
     // Remove from trash index
     trashIndex.items = trashIndex.items.filter(item => item.id !== noteId);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Restored note ${noteId} from trash`);
   } catch (error) {
     logger.error(`Error restoring note ${noteId} from trash:`, error);
@@ -572,7 +579,7 @@ export async function restoreFlowFromTrash(flowId: string): Promise<void> {
 
     const trashIndex = await readTrashIndex();
     const trashItem = trashIndex.items.find(item => item.id === flowId && item.type === 'flow');
-    
+
     if (!trashItem) {
       logger.warn(`Flow ${flowId} not found in trash`);
       return;
@@ -582,22 +589,22 @@ export async function restoreFlowFromTrash(flowId: string): Promise<void> {
     const trashFlowsDir = await ensureTrashSubdirectory('flows');
     const pathParts = trashItem.trashPath.split('/');
     const filename = pathParts[pathParts.length - 1];
-    
+
     const trashFile = await trashFlowsDir.getFileHandle(filename, { create: false });
     const fileContent = await (await trashFile.getFile()).text();
     const flow = JSON.parse(fileContent);
-    
+
     // Restore to original location
     await writeFlowToFile(flow);
-    
+
     // Delete from trash
     await trashFlowsDir.removeEntry(filename, { recursive: false });
-    
+
     // Remove from trash index
     trashIndex.items = trashIndex.items.filter(item => item.id !== flowId);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Restored flow ${flowId} from trash`);
   } catch (error) {
     logger.error(`Error restoring flow ${flowId} from trash:`, error);
@@ -614,7 +621,7 @@ export async function restoreFolderFromTrash(folderName: string): Promise<void> 
     const folderItem = trashIndex.items.find(
       item => item.type === 'folder' && item.title === folderName
     );
-    
+
     if (!folderItem || !folderItem.metadata?.noteIds) {
       logger.warn(`Folder ${folderName} not found in trash or has no notes`);
       return;
@@ -624,14 +631,14 @@ export async function restoreFolderFromTrash(folderName: string): Promise<void> 
     for (const noteId of folderItem.metadata.noteIds) {
       await restoreNoteFromTrash(noteId);
     }
-    
+
     // Remove folder from trash index
     trashIndex.items = trashIndex.items.filter(
       item => !(item.type === 'folder' && item.title === folderName)
     );
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Restored folder ${folderName} from trash`);
   } catch (error) {
     logger.error(`Error restoring folder ${folderName} from trash:`, error);
@@ -653,7 +660,7 @@ export async function restoreCategoryFromTrash(categoryName: string): Promise<vo
     const categoryItem = trashIndex.items.find(
       item => item.type === 'category' && item.title === categoryName
     );
-    
+
     if (!categoryItem || !categoryItem.metadata?.flowIds) {
       logger.warn(`Category ${categoryName} not found in trash or has no flows`);
       return;
@@ -663,14 +670,14 @@ export async function restoreCategoryFromTrash(categoryName: string): Promise<vo
     for (const flowId of categoryItem.metadata.flowIds) {
       await restoreFlowFromTrash(flowId);
     }
-    
+
     // Remove category from trash index
     trashIndex.items = trashIndex.items.filter(
       item => !(item.type === 'category' && item.title === categoryName)
     );
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Restored category ${categoryName} from trash`);
   } catch (error) {
     logger.error(`Error restoring category ${categoryName} from trash:`, error);
@@ -717,7 +724,7 @@ export async function permanentlyDeleteNote(noteId: string): Promise<void> {
   try {
     const trashIndex = await readTrashIndex();
     const trashItem = trashIndex.items.find(item => item.id === noteId && item.type === 'note');
-    
+
     if (!trashItem) {
       logger.warn(`Note ${noteId} not found in trash`);
       return;
@@ -734,7 +741,9 @@ export async function permanentlyDeleteNote(noteId: string): Promise<void> {
     } else {
       // File system trash item
       if (!isFolderConfigured() || !hasDirectoryAccess()) {
-        logger.warn('Cannot permanently delete note from file system trash: file system not configured');
+        logger.warn(
+          'Cannot permanently delete note from file system trash: file system not configured'
+        );
         return;
       }
 
@@ -742,7 +751,7 @@ export async function permanentlyDeleteNote(noteId: string): Promise<void> {
       const trashNotesDir = await ensureTrashSubdirectory('notes');
       const pathParts = trashItem.trashPath.split('/');
       const filename = pathParts[pathParts.length - 1];
-      
+
       try {
         await trashNotesDir.removeEntry(filename, { recursive: false });
       } catch (error: any) {
@@ -751,12 +760,12 @@ export async function permanentlyDeleteNote(noteId: string): Promise<void> {
         }
       }
     }
-    
+
     // Remove from trash index
     trashIndex.items = trashIndex.items.filter(item => item.id !== noteId);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Permanently deleted note ${noteId} from trash`);
   } catch (error) {
     logger.error(`Error permanently deleting note ${noteId}:`, error);
@@ -776,7 +785,7 @@ export async function permanentlyDeleteFlow(flowId: string): Promise<void> {
 
     const trashIndex = await readTrashIndex();
     const trashItem = trashIndex.items.find(item => item.id === flowId && item.type === 'flow');
-    
+
     if (!trashItem) {
       logger.warn(`Flow ${flowId} not found in trash`);
       return;
@@ -786,7 +795,7 @@ export async function permanentlyDeleteFlow(flowId: string): Promise<void> {
     const trashFlowsDir = await ensureTrashSubdirectory('flows');
     const pathParts = trashItem.trashPath.split('/');
     const filename = pathParts[pathParts.length - 1];
-    
+
     try {
       await trashFlowsDir.removeEntry(filename, { recursive: false });
     } catch (error: any) {
@@ -794,12 +803,12 @@ export async function permanentlyDeleteFlow(flowId: string): Promise<void> {
         logger.warn(`Could not delete file ${filename} from trash:`, error);
       }
     }
-    
+
     // Remove from trash index
     trashIndex.items = trashIndex.items.filter(item => item.id !== flowId);
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Permanently deleted flow ${flowId} from trash`);
   } catch (error) {
     logger.error(`Error permanently deleting flow ${flowId}:`, error);
@@ -816,7 +825,7 @@ export async function permanentlyDeleteFolder(folderName: string): Promise<void>
     const folderItem = trashIndex.items.find(
       item => item.type === 'folder' && item.title === folderName
     );
-    
+
     if (!folderItem) {
       logger.warn(`Folder ${folderName} not found in trash`);
       return;
@@ -828,14 +837,14 @@ export async function permanentlyDeleteFolder(folderName: string): Promise<void>
         await permanentlyDeleteNote(noteId);
       }
     }
-    
+
     // Remove folder from trash index
     trashIndex.items = trashIndex.items.filter(
       item => !(item.type === 'folder' && item.title === folderName)
     );
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Permanently deleted folder ${folderName} from trash`);
   } catch (error) {
     logger.error(`Error permanently deleting folder ${folderName}:`, error);
@@ -857,7 +866,7 @@ export async function permanentlyDeleteCategory(categoryName: string): Promise<v
     const categoryItem = trashIndex.items.find(
       item => item.type === 'category' && item.title === categoryName
     );
-    
+
     if (!categoryItem) {
       logger.warn(`Category ${categoryName} not found in trash`);
       return;
@@ -869,14 +878,14 @@ export async function permanentlyDeleteCategory(categoryName: string): Promise<v
         await permanentlyDeleteFlow(flowId);
       }
     }
-    
+
     // Remove category from trash index
     trashIndex.items = trashIndex.items.filter(
       item => !(item.type === 'category' && item.title === categoryName)
     );
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log(`Permanently deleted category ${categoryName} from trash`);
   } catch (error) {
     logger.error(`Error permanently deleting category ${categoryName}:`, error);
@@ -895,7 +904,7 @@ export async function emptyTrash(): Promise<void> {
     }
 
     const trashIndex = await readTrashIndex();
-    
+
     // Permanently delete all items
     for (const item of trashIndex.items) {
       try {
@@ -918,16 +927,15 @@ export async function emptyTrash(): Promise<void> {
         // Continue with other items
       }
     }
-    
+
     // Clear trash index
     trashIndex.items = [];
     trashIndex.lastUpdated = new Date().toISOString();
     await writeTrashIndex(trashIndex);
-    
+
     logger.log('Trash emptied');
   } catch (error) {
     logger.error('Error emptying trash:', error);
     throw error;
   }
 }
-

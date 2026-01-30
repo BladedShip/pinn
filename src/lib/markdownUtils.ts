@@ -38,7 +38,7 @@ export function createSlugFromTitle(title: string): string {
   }
 
   const cleaned = removeEmojisAndSpecialChars(title);
-  
+
   // Convert to lowercase and replace spaces/underscores with hyphens
   const slug = cleaned
     .toLowerCase()
@@ -63,12 +63,12 @@ export function generateUniqueSlug(
   if (!baseSlug || baseSlug === 'untitled' || isUntitled) {
     let counter = 1;
     let candidate = `untitled-${counter}`;
-    
+
     while (existingSlugs.has(candidate)) {
       counter++;
       candidate = `untitled-${counter}`;
     }
-    
+
     return candidate;
   }
 
@@ -80,7 +80,7 @@ export function generateUniqueSlug(
   // Handle collision - try appending numbers first
   let counter = 1;
   let candidate = `${baseSlug}-${counter}`;
-  
+
   while (existingSlugs.has(candidate) && counter < 1000) {
     counter++;
     candidate = `${baseSlug}-${counter}`;
@@ -90,7 +90,7 @@ export function generateUniqueSlug(
   if (existingSlugs.has(candidate)) {
     const randomSuffix = Math.random().toString(36).substring(2, 6);
     candidate = `${baseSlug}-${randomSuffix}`;
-    
+
     // Final check - if still colliding, add timestamp
     if (existingSlugs.has(candidate)) {
       const timestamp = Date.now().toString(36).substring(7);
@@ -170,8 +170,10 @@ export function parseMarkdownWithFrontmatter(content: string): {
     let value = trimmed.substring(colonIndex + 1).trim();
 
     // Remove quotes if present
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
 
@@ -192,10 +194,7 @@ export function parseMarkdownWithFrontmatter(content: string): {
 /**
  * Serialize note to markdown with YAML frontmatter
  */
-export function serializeMarkdownWithFrontmatter(
-  metadata: NoteMetadata,
-  content: string
-): string {
+export function serializeMarkdownWithFrontmatter(metadata: NoteMetadata, content: string): string {
   const frontmatter = [
     '---',
     `id: ${metadata.id}`,
@@ -218,4 +217,3 @@ export function getNoteFilename(note: NoteMetadata, extension: string = 'md'): s
   const baseSlug = slug || 'untitled';
   return `${baseSlug}.${extension}`;
 }
-

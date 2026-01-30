@@ -9,7 +9,11 @@ interface SyncSelectionDialogProps {
   onConfirm: (selectedNotes: string[], selectedFlows: string[]) => void;
 }
 
-export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: SyncSelectionDialogProps) {
+export default function SyncSelectionDialog({
+  isOpen,
+  onClose,
+  onConfirm,
+}: SyncSelectionDialogProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [flows, setFlows] = useState<Flow[]>([]);
   const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set());
@@ -24,7 +28,7 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
       const allFlows = getFlows();
       setNotes(allNotes);
       setFlows(allFlows);
-      
+
       // Select all by default
       setSelectedNotes(new Set(allNotes.map(n => n.id)));
       setSelectedFlows(new Set(allFlows.map(f => f.id)));
@@ -36,9 +40,10 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
     }
   }, [isOpen]);
 
-  const filteredNotes = notes.filter(note =>
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredNotes = notes.filter(
+    note =>
+      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredFlows = flows.filter(flow =>
@@ -93,19 +98,21 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
   const allSelected = currentTotalCount > 0 && currentSelectedCount === currentTotalCount;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-3xl h-[85vh] border border-theme-border overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-theme-border flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-theme-text-primary">Select Items to Sync</h2>
+              <h2 className="text-xl font-semibold text-theme-text-primary">
+                Select Items to Sync
+              </h2>
               <p className="text-xs text-theme-text-secondary mt-0.5">
                 Choose which notes and flows to sync to the cloud
               </p>
@@ -152,7 +159,7 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               placeholder={`Search ${activeTab}...`}
               className="w-full bg-theme-bg-darker border border-theme-border rounded-lg pl-10 pr-4 py-2 text-theme-text-primary placeholder-theme-text-tertiary focus:outline-none focus:ring-2 focus:ring-theme-border focus:border-transparent transition-all text-sm"
             />
@@ -194,7 +201,7 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
                   </p>
                 </div>
               ) : (
-                filteredNotes.map((note) => {
+                filteredNotes.map(note => {
                   const isSelected = selectedNotes.has(note.id);
                   return (
                     <div
@@ -207,11 +214,13 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                          isSelected
-                            ? 'border-theme-accent bg-theme-accent'
-                            : 'border-theme-border'
-                        }`}>
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            isSelected
+                              ? 'border-theme-accent bg-theme-accent'
+                              : 'border-theme-border'
+                          }`}
+                        >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -245,7 +254,7 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
                   </p>
                 </div>
               ) : (
-                filteredFlows.map((flow) => {
+                filteredFlows.map(flow => {
                   const isSelected = selectedFlows.has(flow.id);
                   return (
                     <div
@@ -258,11 +267,13 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                          isSelected
-                            ? 'border-theme-accent bg-theme-accent'
-                            : 'border-theme-border'
-                        }`}>
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            isSelected
+                              ? 'border-theme-accent bg-theme-accent'
+                              : 'border-theme-border'
+                          }`}
+                        >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -291,7 +302,8 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
         {/* Footer */}
         <div className="px-6 py-4 border-t border-theme-border flex justify-between items-center flex-shrink-0 bg-theme-bg-darker">
           <div className="text-sm text-theme-text-secondary">
-            {selectedNotes.size + selectedFlows.size} item{selectedNotes.size + selectedFlows.size !== 1 ? 's' : ''} selected
+            {selectedNotes.size + selectedFlows.size} item
+            {selectedNotes.size + selectedFlows.size !== 1 ? 's' : ''} selected
           </div>
           <div className="flex gap-3">
             <button
@@ -313,4 +325,3 @@ export default function SyncSelectionDialog({ isOpen, onClose, onConfirm }: Sync
     </div>
   );
 }
-

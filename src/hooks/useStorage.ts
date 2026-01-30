@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
  */
 export function useStorage(onRefresh: () => void): void {
   const onRefreshRef = useRef(onRefresh);
-  
+
   // Keep ref up to date
   useEffect(() => {
     onRefreshRef.current = onRefresh;
@@ -24,4 +24,3 @@ export function useStorage(onRefresh: () => void): void {
     };
   }, []); // Empty deps - ref is always current
 }
-

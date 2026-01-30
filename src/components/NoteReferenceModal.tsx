@@ -35,7 +35,7 @@ export default function NoteReferenceModal({
     try {
       const allNotes = getNotes();
       // Filter out the current note from the list
-      const availableNotes = allNotes.filter((note) => note.id !== currentNoteId);
+      const availableNotes = allNotes.filter(note => note.id !== currentNoteId);
       setNotes(availableNotes);
     } catch (error) {
       logger.error('Error loading notes:', error);
@@ -51,9 +51,7 @@ export default function NoteReferenceModal({
 
     const query = searchQuery.toLowerCase();
     const filtered = notes.filter(
-      (note) =>
-        note.title.toLowerCase().includes(query) ||
-        note.content.toLowerCase().includes(query)
+      note => note.title.toLowerCase().includes(query) || note.content.toLowerCase().includes(query)
     );
     setFilteredNotes(filtered);
   };
@@ -87,23 +85,23 @@ export default function NoteReferenceModal({
               type="text"
               placeholder="Search notes..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-theme-bg-secondary border border-theme-border rounded-lg pl-10 pr-3 py-2 text-sm text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
               autoFocus
             />
           </div>
         </div>
 
-        <div 
+        <div
           className="px-6 py-4 max-h-96 overflow-y-auto note-reference-modal-scroll"
-          style={{ 
-            scrollbarWidth: 'none', /* Firefox */
-            msOverflowStyle: 'none', /* IE and Edge */
+          style={{
+            scrollbarWidth: 'none' /* Firefox */,
+            msOverflowStyle: 'none' /* IE and Edge */,
           }}
         >
           {filteredNotes.length > 0 ? (
             <div className="space-y-2">
-              {filteredNotes.map((note) => (
+              {filteredNotes.map(note => (
                 <button
                   key={note.id}
                   onClick={() => handleSelectNote(note.id, note.title)}
@@ -115,11 +113,7 @@ export default function NoteReferenceModal({
                       <h3 className="text-theme-text-primary group-hover:text-white transition-colors font-medium truncate">
                         {note.title || 'Untitled'}
                       </h3>
-                      {note.folder && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {note.folder}
-                        </p>
-                      )}
+                      {note.folder && <p className="text-xs text-gray-500 mt-1">{note.folder}</p>}
                       <p className="text-sm text-gray-500 mt-1 line-clamp-2">
                         {note.content.substring(0, 150) || 'No content'}
                       </p>
@@ -155,4 +149,3 @@ export default function NoteReferenceModal({
     </div>
   );
 }
-

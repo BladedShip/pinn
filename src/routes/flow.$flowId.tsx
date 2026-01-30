@@ -11,6 +11,3 @@ export const Route = createFileRoute('/flow/$flowId')({
     </Suspense>
   ),
 });
-
-
-

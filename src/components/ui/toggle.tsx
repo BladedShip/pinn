@@ -1,9 +1,9 @@
-import * as React from "react"
-import { cn } from "../../lib/utils"
+import * as React from 'react';
+import { cn } from '../../lib/utils';
 
 interface ToggleProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  pressed?: boolean
-  onPressedChange?: (pressed: boolean) => void
+  pressed?: boolean;
+  onPressedChange?: (pressed: boolean) => void;
 }
 
 const Toggle = React.forwardRef<HTMLButtonElement, ToggleProps>(
@@ -13,20 +13,20 @@ const Toggle = React.forwardRef<HTMLButtonElement, ToggleProps>(
         ref={ref}
         type="button"
         aria-pressed={pressed}
-        data-state={pressed ? "on" : "off"}
+        data-state={pressed ? 'on' : 'off'}
         className={cn(
-          "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground p-2",
+          'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground p-2',
           className
         )}
-        onClick={(e) => {
-          onClick?.(e)
-          onPressedChange?.(!pressed)
+        onClick={e => {
+          onClick?.(e);
+          onPressedChange?.(!pressed);
         }}
         {...props}
       />
-    )
+    );
   }
-)
-Toggle.displayName = "Toggle"
+);
+Toggle.displayName = 'Toggle';
 
-export { Toggle }
+export { Toggle };

@@ -9,7 +9,13 @@ interface ToastProps {
   duration?: number;
 }
 
-export default function Toast({ isOpen, onClose, message, type = 'success', duration = 3000 }: ToastProps) {
+export default function Toast({
+  isOpen,
+  onClose,
+  message,
+  type = 'success',
+  duration = 3000,
+}: ToastProps) {
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
@@ -29,7 +35,9 @@ export default function Toast({ isOpen, onClose, message, type = 'success', dura
 
   return (
     <div className="fixed top-4 right-4 z-[100] animate-slide-in">
-      <div className={`bg-theme-bg-primary border ${borderColor} rounded-lg shadow-2xl min-w-[300px] max-w-[500px] overflow-hidden`}>
+      <div
+        className={`bg-theme-bg-primary border ${borderColor} rounded-lg shadow-2xl min-w-[300px] max-w-[500px] overflow-hidden`}
+      >
         <div className="px-4 py-3 flex items-center gap-3">
           <div className={`${iconBgColor} rounded-lg p-2 flex-shrink-0`}>
             <Icon className={`w-5 h-5 ${iconColor}`} />
@@ -61,4 +69,3 @@ export default function Toast({ isOpen, onClose, message, type = 'success', dura
     </div>
   );
 }
-

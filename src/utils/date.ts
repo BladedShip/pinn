@@ -63,4 +63,3 @@ export function formatTime(dateString: string): string {
     second: '2-digit',
   });
 }
-

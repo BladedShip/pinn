@@ -10,7 +10,7 @@ export function useClickOutside<T extends HTMLElement>(
   handler: (event: MouseEvent | TouchEvent) => void
 ): void {
   const handlerRef = useRef(handler);
-  
+
   // Keep ref up to date
   useEffect(() => {
     handlerRef.current = handler;
@@ -34,4 +34,3 @@ export function useClickOutside<T extends HTMLElement>(
     };
   }, [ref]); // Only depend on ref, handler is accessed via ref
 }
-

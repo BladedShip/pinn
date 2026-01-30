@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { Trash2, RotateCcw, X, Search, ChevronLeft, FileText, GitBranch, Folder, Tag } from 'lucide-react';
+import {
+  Trash2,
+  RotateCcw,
+  X,
+  Search,
+  ChevronLeft,
+  FileText,
+  GitBranch,
+  Folder,
+  Tag,
+} from 'lucide-react';
 import {
   getTrashedNotes,
   getTrashedFlows,
@@ -25,15 +35,17 @@ type TrashFilter = 'all' | 'notes' | 'flows' | 'folders' | 'categories';
 export default function TrashPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/trash' });
-  
+
   const [trashedNotes, setTrashedNotes] = useState<TrashedItem[]>([]);
   const [trashedFlows, setTrashedFlows] = useState<TrashedItem[]>([]);
   const [trashedFolders, setTrashedFolders] = useState<TrashedItem[]>([]);
   const [trashedCategories, setTrashedCategories] = useState<TrashedItem[]>([]);
   const [searchQuery, setSearchQuery] = useState((search as { search?: string })?.search || '');
-  const [filter, setFilter] = useState<TrashFilter>((search as { filter?: TrashFilter })?.filter || 'all');
+  const [filter, setFilter] = useState<TrashFilter>(
+    (search as { filter?: TrashFilter })?.filter || 'all'
+  );
   const [loading, setLoading] = useState(true);
-  
+
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
@@ -115,9 +127,16 @@ export default function TrashPage() {
   };
 
   const showDeleteConfirm = (item: TrashedItem) => {
-    const itemType = item.type === 'note' ? 'note' : item.type === 'flow' ? 'flow' : item.type === 'folder' ? 'folder' : 'category';
+    const itemType =
+      item.type === 'note'
+        ? 'note'
+        : item.type === 'flow'
+          ? 'flow'
+          : item.type === 'folder'
+            ? 'folder'
+            : 'category';
     const itemName = item.title;
-    
+
     setConfirmAction({
       type: 'delete',
       item,
@@ -152,8 +171,9 @@ export default function TrashPage() {
   };
 
   const showEmptyTrashConfirm = () => {
-    const totalItems = trashedNotes.length + trashedFlows.length + trashedFolders.length + trashedCategories.length;
-    
+    const totalItems =
+      trashedNotes.length + trashedFlows.length + trashedFolders.length + trashedCategories.length;
+
     setConfirmAction({
       type: 'empty',
       variant: 'danger',
@@ -175,7 +195,7 @@ export default function TrashPage() {
 
   const filteredItems = () => {
     let items: TrashedItem[] = [];
-    
+
     switch (filter) {
       case 'notes':
         items = trashedNotes;
@@ -192,15 +212,16 @@ export default function TrashPage() {
       default:
         items = [...trashedNotes, ...trashedFlows, ...trashedFolders, ...trashedCategories];
     }
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      items = items.filter(item => 
-        item.title.toLowerCase().includes(query) ||
-        item.originalPath.toLowerCase().includes(query)
+      items = items.filter(
+        item =>
+          item.title.toLowerCase().includes(query) ||
+          item.originalPath.toLowerCase().includes(query)
       );
     }
-    
+
     return items.sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
   };
 
@@ -222,7 +243,7 @@ export default function TrashPage() {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       return 'Today';
     } else if (diffDays === 1) {
@@ -234,7 +255,8 @@ export default function TrashPage() {
     }
   };
 
-  const totalItems = trashedNotes.length + trashedFlows.length + trashedFolders.length + trashedCategories.length;
+  const totalItems =
+    trashedNotes.length + trashedFlows.length + trashedFolders.length + trashedCategories.length;
   const filtered = filteredItems();
 
   return (
@@ -261,7 +283,7 @@ export default function TrashPage() {
                 )}
               </div>
             </div>
-            
+
             {totalItems > 0 && (
               <button
                 onClick={showEmptyTrashConfirm}
@@ -285,13 +307,13 @@ export default function TrashPage() {
               type="text"
               placeholder="Search trash..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-theme-bg-secondary border border-theme-border rounded-lg text-theme-text-primary placeholder-theme-text-secondary focus:outline-none focus:ring-2 focus:ring-theme-accent"
             />
           </div>
-          
+
           <div className="flex gap-2 flex-wrap">
-            {(['all', 'notes', 'flows', 'folders', 'categories'] as TrashFilter[]).map((f) => (
+            {(['all', 'notes', 'flows', 'folders', 'categories'] as TrashFilter[]).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -304,10 +326,13 @@ export default function TrashPage() {
                 {f.charAt(0).toUpperCase() + f.slice(1)}
                 {f !== 'all' && (
                   <span className="ml-2 text-xs opacity-75">
-                    {f === 'notes' ? trashedNotes.length :
-                     f === 'flows' ? trashedFlows.length :
-                     f === 'folders' ? trashedFolders.length :
-                     trashedCategories.length}
+                    {f === 'notes'
+                      ? trashedNotes.length
+                      : f === 'flows'
+                        ? trashedFlows.length
+                        : f === 'folders'
+                          ? trashedFolders.length
+                          : trashedCategories.length}
                   </span>
                 )}
               </button>
@@ -327,7 +352,7 @@ export default function TrashPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((item) => (
+            {filtered.map(item => (
               <div
                 key={`${item.type}-${item.id}`}
                 className="bg-theme-bg-secondary border border-theme-border rounded-lg p-4 hover:bg-theme-bg-tertiary transition-colors"
@@ -357,7 +382,7 @@ export default function TrashPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                     <button
                       onClick={() => {
@@ -415,4 +440,3 @@ export default function TrashPage() {
     </div>
   );
 }
-

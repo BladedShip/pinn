@@ -32,4 +32,3 @@ export interface Flow {
   created_at: string;
   updated_at: string;
 }
-

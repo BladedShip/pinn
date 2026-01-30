@@ -51,11 +51,7 @@ export function normalizeString(str: string | undefined | null): string {
  * @param extension - File extension (without dot)
  * @returns Unique file name
  */
-export function generateUniqueFileName(
-  baseName: string,
-  id: string,
-  extension: string
-): string {
+export function generateUniqueFileName(baseName: string, id: string, extension: string): string {
   const sanitized = sanitizeFileName(baseName);
   const shortId = id.slice(0, 8);
   return `${sanitized}_${shortId}.${extension}`;
@@ -69,4 +65,3 @@ export function generateUniqueFileName(
 export function isEmpty(str: string | undefined | null): boolean {
   return !str || normalizeString(str).length === 0;
 }
-

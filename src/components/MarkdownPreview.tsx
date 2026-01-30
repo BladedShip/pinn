@@ -13,16 +13,16 @@ interface MarkdownPreviewProps {
 
 export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownPreviewProps) {
   const [copiedCodeBlocks, setCopiedCodeBlocks] = useState<Set<number>>(new Set());
-  
+
   // Helper function to process tags in text
   const processTagsInText = (text: string): React.ReactNode[] => {
     if (!text) return [text];
-    
+
     const tagPattern = /(#\w+)/g;
     const parts: Array<{ text: string; isTag: boolean }> = [];
     let lastIndex = 0;
     let match;
-    
+
     while ((match = tagPattern.exec(text)) !== null) {
       if (match.index > lastIndex) {
         parts.push({ text: text.substring(lastIndex, match.index), isTag: false });
@@ -30,15 +30,15 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
       parts.push({ text: match[0], isTag: true });
       lastIndex = match.index + match[0].length;
     }
-    
+
     if (lastIndex < text.length) {
       parts.push({ text: text.substring(lastIndex), isTag: false });
     }
-    
+
     if (parts.length === 0) {
       return [text];
     }
-    
+
     return parts.map((part, index) => {
       if (part.isTag) {
         return (
@@ -53,7 +53,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
       return <span key={`text-${index}`}>{part.text}</span>;
     });
   };
-  
+
   const handleCopyCode = async (code: string, index: number) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -70,49 +70,48 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
     }
   };
 
-
   // Aggressively merge URLs into the same paragraph as surrounding text
   const preprocessContent = (text: string): string => {
     if (!text) return text;
-    
+
     // Split into lines to process table rows separately
     const lines = text.split('\n');
     const processed: string[] = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
       const isTableRow = line.includes('|') && line.trim().startsWith('|');
-      
+
       if (!isTableRow) {
         // For non-table content, replace <br> tags with markdown line breaks (two spaces + newline)
         line = line.replace(/<br\s*\/?>/gi, '  \n');
       }
       // For table rows, keep <br> tags as-is - they'll be escaped by react-markdown
       // and handled by our custom cell renderers
-      
+
       processed.push(line);
     }
-    
+
     let result = processed.join('\n');
-    
+
     // Replace any newlines (single or multiple) around URLs with a single space
     // This forces URLs to stay inline with text
-    
+
     // Replace: text + newline(s) + URL with: text + space + URL
     result = result.replace(/([^\n])\n+(?=https?:\/\/)/g, '$1 ');
-    
+
     // Replace: URL + newline(s) + text with: URL + space + text
     result = result.replace(/(https?:\/\/[^\s]+)\n+([^\n])/g, '$1 $2');
-    
+
     // Special case: if a line is ONLY a URL, merge it
     // Split into lines and process
     const urlProcessedLines = result.split('\n');
     const finalProcessed: string[] = [];
-    
+
     for (let i = 0; i < urlProcessedLines.length; i++) {
       const line = urlProcessedLines[i].trim();
       const isOnlyUrl = /^https?:\/\/[^\s]+$/.test(line);
-      
+
       if (isOnlyUrl && finalProcessed.length > 0) {
         // Append URL to previous line with a space
         finalProcessed[finalProcessed.length - 1] += ' ' + line;
@@ -128,39 +127,48 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
         finalProcessed.push(urlProcessedLines[i]);
       }
     }
-    
+
     return finalProcessed.join('\n');
   };
 
   const processedContent = preprocessContent(content);
 
   return (
-    <div className="w-full prose prose-invert prose-gray max-w-none markdown-preview" style={{ minHeight: 'calc(100vh - 300px)' }}>
-      <ReactMarkdown 
+    <div
+      className="w-full prose prose-invert prose-gray max-w-none markdown-preview"
+      style={{ minHeight: 'calc(100vh - 300px)' }}
+    >
+      <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           text({ node }: any) {
             // Render text nodes with inline URL, note reference, and tag detection
             const text = node.value || '';
-            
+
             // Helper to process text and extract note refs, URLs, and tags
             const processTextWithRefs = (inputText: string): React.ReactNode[] => {
               if (!inputText) return [inputText];
-              
-              const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+
+              const parts: Array<{
+                text: string;
+                type: 'note' | 'url' | 'tag' | 'text';
+                noteId?: string;
+                noteTitle?: string;
+              }> = [];
               let lastIndex = 0;
-              
+
               // Combined pattern to match note refs, URLs, and tags
               // Note: Order matters - note refs first, then URLs, then tags
-              const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+              const combinedPattern =
+                /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
               let match;
-              
+
               while ((match = combinedPattern.exec(inputText)) !== null) {
                 // Add text before the match
                 if (match.index > lastIndex) {
                   parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
                 }
-                
+
                 // Determine what was matched
                 if (match[1].startsWith('[[note:')) {
                   // Note reference
@@ -180,27 +188,27 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   // Shouldn't happen, but fallback
                   parts.push({ text: match[1], type: 'text' });
                 }
-                
+
                 lastIndex = match.index + match[0].length;
               }
-              
+
               // Add remaining text
               if (lastIndex < inputText.length) {
                 parts.push({ text: inputText.substring(lastIndex), type: 'text' });
               }
-              
+
               // If no matches, return original text
               if (parts.length === 0) {
                 parts.push({ text: inputText, type: 'text' });
               }
-              
+
               // Render parts
               return parts.map((part, index) => {
                 if (part.type === 'note' && part.noteId && part.noteTitle) {
                   return (
                     <span
                       key={`note-ref-${index}`}
-                      onClick={(e) => {
+                      onClick={e => {
                         e.preventDefault();
                         e.stopPropagation();
                         if (onNavigateToNote) {
@@ -226,7 +234,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         whiteSpace: 'nowrap',
                         verticalAlign: 'middle',
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={e => {
                         if (onNavigateToNote) {
                           const target = e.currentTarget as HTMLElement;
                           target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
@@ -235,7 +243,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                           target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
                         }
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={e => {
                         const target = e.currentTarget as HTMLElement;
                         target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
                         target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
@@ -248,7 +256,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                     </span>
                   );
                 }
-                
+
                 if (part.type === 'url') {
                   return (
                     <a
@@ -267,7 +275,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                     </a>
                   );
                 }
-                
+
                 if (part.type === 'tag') {
                   return (
                     <span
@@ -278,36 +286,39 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                     </span>
                   );
                 }
-                
+
                 // Plain text - process for nested tags (in case tags appear in plain text segments)
                 return <span key={`text-${index}`}>{part.text}</span>;
               });
             };
-            
+
             return <>{processTextWithRefs(text)}</>;
           },
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children).replace(/\n$/, '');
             const codeIndex = node?.position?.start?.line || Date.now();
-            
+
             // In react-markdown:
             // - Inline code (backticks): inline === true, no language class, no pre wrapper
             // - Code blocks (triple backticks): inline === false, may have language class, wrapped in pre
             // Check: inline must be true, OR (inline is not false AND no language class AND code is short/single line)
             const hasLanguageClass = match !== null;
-            const isInlineCode = inline === true || (inline !== false && !hasLanguageClass && codeString.split('\n').length === 1);
-            
+            const isInlineCode =
+              inline === true ||
+              (inline !== false && !hasLanguageClass && codeString.split('\n').length === 1);
+
             if (isInlineCode) {
               // Inline code - render as inline element without copy button
               // Don't spread className from props as it might contain block-level classes
               const { className: propClassName, ...restProps } = props;
               return (
-                <code 
-                  className="inline-code" 
+                <code
+                  className="inline-code"
                   style={{
                     display: 'inline !important',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                     margin: '0 !important',
                     padding: '0.2rem 0.5rem',
                     width: 'auto !important',
@@ -319,64 +330,65 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                 </code>
               );
             }
-            
+
             // Code block - handle both with and without language
             const language = match ? match[1] : 'text';
-            
+
             return (
-                <div className="relative group code-block-wrapper">
-                  <div className="absolute top-3 right-3 z-10">
-                    <button
-                      onClick={() => handleCopyCode(codeString, codeIndex)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-theme-bg-primary/90 hover:bg-theme-bg-primary backdrop-blur-sm border border-gray-600/50 rounded-md text-theme-text-secondary hover:text-theme-text-primary transition-all text-xs"
-                      title="Copy code"
-                    >
-                      {copiedCodeBlocks.has(codeIndex) ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-green-400" />
-                          <span className="text-green-400">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <SyntaxHighlighter
-                    language={language}
-                    style={oneDark}
-                    PreTag="div"
-                    customStyle={{
-                      margin: '1rem 0',
-                      borderRadius: '6px',
-                      padding: '0.75rem',
-                      paddingTop: '2.25rem',
-                      paddingBottom: '0.75rem',
-                      overflowX: 'hidden',
-                      wordWrap: 'break-word',
-                      whiteSpace: 'pre-wrap',
-                      overflowWrap: 'break-word',
-                      backgroundColor: 'var(--color-bg-secondary)',
-                      border: 'none',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.5',
-                      color: 'var(--color-text-primary)',
-                    }}
-                    codeTagProps={{
-                      style: {
-                        color: 'var(--color-text-primary)',
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                        background: 'transparent',
-                      }
-                    }}
-                    {...props}
+              <div className="relative group code-block-wrapper">
+                <div className="absolute top-3 right-3 z-10">
+                  <button
+                    onClick={() => handleCopyCode(codeString, codeIndex)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-theme-bg-primary/90 hover:bg-theme-bg-primary backdrop-blur-sm border border-gray-600/50 rounded-md text-theme-text-secondary hover:text-theme-text-primary transition-all text-xs"
+                    title="Copy code"
                   >
-                    {codeString}
-                  </SyntaxHighlighter>
+                    {copiedCodeBlocks.has(codeIndex) ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-green-400" />
+                        <span className="text-green-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              );
+                <SyntaxHighlighter
+                  language={language}
+                  style={oneDark}
+                  PreTag="div"
+                  customStyle={{
+                    margin: '1rem 0',
+                    borderRadius: '6px',
+                    padding: '0.75rem',
+                    paddingTop: '2.25rem',
+                    paddingBottom: '0.75rem',
+                    overflowX: 'hidden',
+                    wordWrap: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'break-word',
+                    backgroundColor: 'var(--color-bg-secondary)',
+                    border: 'none',
+                    fontSize: '0.875rem',
+                    lineHeight: '1.5',
+                    color: 'var(--color-text-primary)',
+                  }}
+                  codeTagProps={{
+                    style: {
+                      color: 'var(--color-text-primary)',
+                      fontFamily:
+                        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                      background: 'transparent',
+                    },
+                  }}
+                  {...props}
+                >
+                  {codeString}
+                </SyntaxHighlighter>
+              </div>
+            );
           },
           pre({ children, ...props }: any) {
             // Pre tags only wrap code blocks, never inline code
@@ -407,7 +419,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   parts.push(
                     <span
                       key={`note-ref-${match.index}`}
-                      onClick={(e) => {
+                      onClick={e => {
                         e.preventDefault();
                         e.stopPropagation();
                         if (onNavigateToNote) {
@@ -433,7 +445,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         whiteSpace: 'nowrap',
                         verticalAlign: 'middle',
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={e => {
                         if (onNavigateToNote) {
                           const target = e.currentTarget as HTMLElement;
                           target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
@@ -442,7 +454,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                           target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
                         }
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={e => {
                         const target = e.currentTarget as HTMLElement;
                         target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
                         target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
@@ -476,7 +488,11 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   }
                   // If it's a text node object
                   if (child?.props?.node?.type === 'text' && child?.props?.node?.value) {
-                    return <React.Fragment key={index}>{parseContent(child.props.node.value)}</React.Fragment>;
+                    return (
+                      <React.Fragment key={index}>
+                        {parseContent(child.props.node.value)}
+                      </React.Fragment>
+                    );
                   }
                   return child;
                 });
@@ -518,18 +534,27 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                 // Use the same processing logic as the text component
                 const processTextWithRefs = (inputText: string): React.ReactNode[] => {
                   if (!inputText) return [inputText];
-                  
-                  const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+
+                  const parts: Array<{
+                    text: string;
+                    type: 'note' | 'url' | 'tag' | 'text';
+                    noteId?: string;
+                    noteTitle?: string;
+                  }> = [];
                   let lastIndex = 0;
-                  
-                  const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+
+                  const combinedPattern =
+                    /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
                   let match;
-                  
+
                   while ((match = combinedPattern.exec(inputText)) !== null) {
                     if (match.index > lastIndex) {
-                      parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
+                      parts.push({
+                        text: inputText.substring(lastIndex, match.index),
+                        type: 'text',
+                      });
                     }
-                    
+
                     if (match[1].startsWith('[[note:')) {
                       parts.push({
                         text: '',
@@ -544,24 +569,24 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                     } else {
                       parts.push({ text: match[1], type: 'text' });
                     }
-                    
+
                     lastIndex = match.index + match[0].length;
                   }
-                  
+
                   if (lastIndex < inputText.length) {
                     parts.push({ text: inputText.substring(lastIndex), type: 'text' });
                   }
-                  
+
                   if (parts.length === 0) {
                     parts.push({ text: inputText, type: 'text' });
                   }
-                  
+
                   return parts.map((part, index) => {
                     if (part.type === 'note' && part.noteId && part.noteTitle) {
                       return (
                         <span
                           key={`note-ref-li-${index}`}
-                          onClick={(e) => {
+                          onClick={e => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (onNavigateToNote) {
@@ -587,7 +612,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                             whiteSpace: 'nowrap',
                             verticalAlign: 'middle',
                           }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={e => {
                             if (onNavigateToNote) {
                               const target = e.currentTarget as HTMLElement;
                               target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
@@ -596,7 +621,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                               target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
                             }
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={e => {
                             const target = e.currentTarget as HTMLElement;
                             target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
                             target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
@@ -609,7 +634,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         </span>
                       );
                     }
-                    
+
                     if (part.type === 'url') {
                       return (
                         <a
@@ -628,7 +653,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         </a>
                       );
                     }
-                    
+
                     if (part.type === 'tag') {
                       return (
                         <span
@@ -639,11 +664,11 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         </span>
                       );
                     }
-                    
+
                     return <span key={`text-li-${index}`}>{part.text}</span>;
                   });
                 };
-                
+
                 return <>{processTextWithRefs(children)}</>;
               }
               if (Array.isArray(children)) {
@@ -651,18 +676,27 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   if (typeof child === 'string') {
                     const processTextWithRefs = (inputText: string): React.ReactNode[] => {
                       if (!inputText) return [inputText];
-                      
-                      const parts: Array<{ text: string; type: 'note' | 'url' | 'tag' | 'text'; noteId?: string; noteTitle?: string }> = [];
+
+                      const parts: Array<{
+                        text: string;
+                        type: 'note' | 'url' | 'tag' | 'text';
+                        noteId?: string;
+                        noteTitle?: string;
+                      }> = [];
                       let lastIndex = 0;
-                      
-                      const combinedPattern = /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
+
+                      const combinedPattern =
+                        /(\[\[note:([^\]|]+)\|([^\]]+)\]\]|https?:\/\/[^\s<>"{}|\\^`\[\]()]+|#\w+)/g;
                       let match;
-                      
+
                       while ((match = combinedPattern.exec(inputText)) !== null) {
                         if (match.index > lastIndex) {
-                          parts.push({ text: inputText.substring(lastIndex, match.index), type: 'text' });
+                          parts.push({
+                            text: inputText.substring(lastIndex, match.index),
+                            type: 'text',
+                          });
                         }
-                        
+
                         if (match[1].startsWith('[[note:')) {
                           parts.push({
                             text: '',
@@ -677,24 +711,24 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                         } else {
                           parts.push({ text: match[1], type: 'text' });
                         }
-                        
+
                         lastIndex = match.index + match[0].length;
                       }
-                      
+
                       if (lastIndex < inputText.length) {
                         parts.push({ text: inputText.substring(lastIndex), type: 'text' });
                       }
-                      
+
                       if (parts.length === 0) {
                         parts.push({ text: inputText, type: 'text' });
                       }
-                      
+
                       return parts.map((part, idx) => {
                         if (part.type === 'note' && part.noteId && part.noteTitle) {
                           return (
                             <span
                               key={`note-ref-li-arr-${idx}`}
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 if (onNavigateToNote) {
@@ -720,7 +754,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                                 whiteSpace: 'nowrap',
                                 verticalAlign: 'middle',
                               }}
-                              onMouseEnter={(e) => {
+                              onMouseEnter={e => {
                                 if (onNavigateToNote) {
                                   const target = e.currentTarget as HTMLElement;
                                   target.style.backgroundColor = 'rgba(232, 147, 95, 0.25)';
@@ -729,7 +763,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                                   target.style.boxShadow = '0 2px 4px rgba(232, 147, 95, 0.2)';
                                 }
                               }}
-                              onMouseLeave={(e) => {
+                              onMouseLeave={e => {
                                 const target = e.currentTarget as HTMLElement;
                                 target.style.backgroundColor = 'rgba(232, 147, 95, 0.15)';
                                 target.style.borderColor = 'rgba(232, 147, 95, 0.4)';
@@ -737,12 +771,14 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                                 target.style.boxShadow = 'none';
                               }}
                             >
-                              <Book style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }} />
+                              <Book
+                                style={{ width: '0.875em', height: '0.875em', flexShrink: 0 }}
+                              />
                               {part.noteTitle}
                             </span>
                           );
                         }
-                        
+
                         if (part.type === 'url') {
                           return (
                             <a
@@ -761,7 +797,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                             </a>
                           );
                         }
-                        
+
                         if (part.type === 'tag') {
                           return (
                             <span
@@ -772,28 +808,30 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                             </span>
                           );
                         }
-                        
+
                         return <span key={`text-li-arr-${idx}`}>{part.text}</span>;
                       });
                     };
-                    
-                    return <React.Fragment key={index}>{processTextWithRefs(child)}</React.Fragment>;
+
+                    return (
+                      <React.Fragment key={index}>{processTextWithRefs(child)}</React.Fragment>
+                    );
                   }
                   if (child?.props?.node?.type === 'text' && child?.props?.node?.value) {
                     // Recursively process text node values
-                    return <React.Fragment key={index}>{processChildren(child.props.node.value)}</React.Fragment>;
+                    return (
+                      <React.Fragment key={index}>
+                        {processChildren(child.props.node.value)}
+                      </React.Fragment>
+                    );
                   }
                   return child;
                 });
               }
               return children;
             };
-            
-            return (
-              <li {...props}>
-                {processChildren(children)}
-              </li>
-            );
+
+            return <li {...props}>{processChildren(children)}</li>;
           },
           td({ node, children, ...props }: any) {
             // Process children to convert <br> tags and markers to line breaks
@@ -803,15 +841,20 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                 let text = content
                   .replace(/&lt;br\s*\/?&gt;/gi, '\u200B\u200B')
                   .replace(/&lt;br&gt;/gi, '\u200B\u200B');
-                
+
                 // Handle regular <br> tags
                 text = text.replace(/<br\s*\/?>/gi, '\u200B\u200B');
-                
+
                 // Split by the marker and convert to React elements
                 const parts = text.split('\u200B\u200B');
                 return parts.map((part, index) => {
                   if (index < parts.length - 1) {
-                    return <React.Fragment key={index}>{part}<br /></React.Fragment>;
+                    return (
+                      <React.Fragment key={index}>
+                        {part}
+                        <br />
+                      </React.Fragment>
+                    );
                   }
                   return part;
                 });
@@ -825,7 +868,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   if (React.isValidElement(child) && 'children' in (child.props as any)) {
                     return React.cloneElement(child as React.ReactElement<any>, {
                       key: index,
-                      children: processCellContent((child.props as any).children)
+                      children: processCellContent((child.props as any).children),
                     });
                   }
                   return child;
@@ -833,7 +876,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
               }
               return content;
             };
-            
+
             return (
               <td {...props} style={{ whiteSpace: 'pre-wrap' }}>
                 {processCellContent(children)}
@@ -848,15 +891,20 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                 let text = content
                   .replace(/&lt;br\s*\/?&gt;/gi, '\u200B\u200B')
                   .replace(/&lt;br&gt;/gi, '\u200B\u200B');
-                
+
                 // Handle regular <br> tags
                 text = text.replace(/<br\s*\/?>/gi, '\u200B\u200B');
-                
+
                 // Split by the marker and convert to React elements
                 const parts = text.split('\u200B\u200B');
                 return parts.map((part, index) => {
                   if (index < parts.length - 1) {
-                    return <React.Fragment key={index}>{part}<br /></React.Fragment>;
+                    return (
+                      <React.Fragment key={index}>
+                        {part}
+                        <br />
+                      </React.Fragment>
+                    );
                   }
                   return part;
                 });
@@ -870,7 +918,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
                   if (React.isValidElement(child) && 'children' in (child.props as any)) {
                     return React.cloneElement(child as React.ReactElement<any>, {
                       key: index,
-                      children: processCellContent((child.props as any).children)
+                      children: processCellContent((child.props as any).children),
                     });
                   }
                   return child;
@@ -878,7 +926,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
               }
               return content;
             };
-            
+
             return (
               <th {...props} style={{ whiteSpace: 'pre-wrap' }}>
                 {processCellContent(children)}
@@ -889,9 +937,7 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
       >
         {processedContent || ''}
       </ReactMarkdown>
-      {!content && (
-        <div className="text-gray-600 italic">Start writing your note...</div>
-      )}
+      {!content && <div className="text-gray-600 italic">Start writing your note...</div>}
       <style>{`
         .markdown-preview {
           color: rgb(209, 213, 219);
@@ -1221,4 +1267,3 @@ export default function MarkdownPreview({ content, onNavigateToNote }: MarkdownP
     </div>
   );
 }
-

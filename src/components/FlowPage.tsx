@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
 import { useParams, useNavigate, useRouter } from '@tanstack/react-router';
 import {
   ReactFlow,
@@ -17,9 +17,43 @@ import {
   NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { FileText, X, Search, Trash2, Tag, Palette, Edit2, Clock, PlusCircle, Calendar, ChevronLeft, Check, HelpCircle, GitBranch, AlertCircle, CheckCircle2, Book } from 'lucide-react';
-import { getFlowById, saveFlow, createFlow as createFlowStorage, Flow, FlowNode, FlowEdge, removeNodeFromFlow, setFlowCategory } from '../lib/flowStorage';
-import { getNotes, getNoteById, getNoteByIdWithContent, saveNote, createNote, Note } from '../lib/storage';
+import {
+  FileText,
+  X,
+  Search,
+  Trash2,
+  Tag,
+  Palette,
+  Edit2,
+  Clock,
+  PlusCircle,
+  Calendar,
+  ChevronLeft,
+  Check,
+  HelpCircle,
+  GitBranch,
+  AlertCircle,
+  CheckCircle2,
+  Book,
+} from 'lucide-react';
+import {
+  getFlowById,
+  saveFlow,
+  createFlow as createFlowStorage,
+  Flow,
+  FlowNode,
+  FlowEdge,
+  removeNodeFromFlow,
+  setFlowCategory,
+} from '../lib/flowStorage';
+import {
+  getNotes,
+  getNoteById,
+  getNoteByIdWithContent,
+  saveNote,
+  createNote,
+  Note,
+} from '../lib/storage';
 import { logger } from '../utils/logger';
 import MarkdownPreview from './MarkdownPreview';
 
@@ -55,26 +89,33 @@ const edgeColors = [
 ];
 
 // Custom Node Component
-function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
+const CustomNode = memo(function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
   const isCompleted = data.completed === true;
-  
+
   return (
     <div
       className="relative"
       style={{
-        background: data.isDeleted ? '#6B7280' : (data.color || '#6366F1'),
+        background: data.isDeleted ? '#6B7280' : data.color || '#6366F1',
         color: '#fff',
-        border: data.isDeleted ? '2px dashed #EF4444' : (isCompleted ? '2px solid #10B981' : '1px solid #3a4450'),
+        border: data.isDeleted
+          ? '2px dashed #EF4444'
+          : isCompleted
+            ? '2px solid #10B981'
+            : '1px solid #3a4450',
         borderRadius: '6px',
         padding: '12px',
         width: '200px',
-        opacity: data.isDeleted ? 0.6 : (isCompleted ? 0.75 : 1),
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        opacity: data.isDeleted ? 0.6 : isCompleted ? 0.75 : 1,
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
       data-node-checkbox-id={id}
     >
       <Handle type="target" position={Position.Top} />
-      <div className={`flex gap-2.5 ${data.isDeleted ? 'flex-col items-center justify-center' : 'items-center'}`}>
+      <div
+        className={`flex gap-2.5 ${data.isDeleted ? 'flex-col items-center justify-center' : 'items-center'}`}
+      >
         {/* Checkbox button */}
         {!data.isDeleted && (
           <div
@@ -83,14 +124,18 @@ function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
             title={isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
           >
             {isCompleted ? (
-              <CheckCircle2 className="w-4 h-4 text-green-300" strokeWidth={2.5} fill="currentColor" />
+              <CheckCircle2
+                className="w-4 h-4 text-green-300"
+                strokeWidth={2.5}
+                fill="currentColor"
+              />
             ) : (
               <div className="w-4 h-4 border-2 border-white/60 rounded-full hover:border-white transition-colors" />
             )}
           </div>
         )}
         <div className={`${data.isDeleted ? 'text-center' : 'flex-1 min-w-0'} flex items-center`}>
-          <div 
+          <div
             className={`${data.isDeleted ? '' : 'truncate'} ${isCompleted ? 'line-through opacity-80' : ''}`}
             style={{
               fontSize: '13px',
@@ -104,7 +149,10 @@ function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
           </div>
         </div>
         {data.isDeleted && (
-          <div className="flex items-center justify-center gap-1 mt-1 text-xs text-red-300" style={{ fontSize: '11px', fontWeight: '400' }}>
+          <div
+            className="flex items-center justify-center gap-1 mt-1 text-xs text-red-300"
+            style={{ fontSize: '11px', fontWeight: '400' }}
+          >
             <AlertCircle className="w-3 h-3 flex-shrink-0" />
             <span>Note deleted</span>
           </div>
@@ -113,7 +161,7 @@ function CustomNode({ data, id }: NodeProps<Node<CustomNodeData>>) {
       <Handle type="source" position={Position.Bottom} />
     </div>
   );
-}
+});
 
 const nodeTypes = {
   default: CustomNode,
@@ -124,7 +172,7 @@ export default function FlowPage() {
   const navigate = useNavigate();
   const router = useRouter();
   const flowId = routeFlowId || null;
-  
+
   const [flow, setFlow] = useState<Flow | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CustomNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -198,20 +246,23 @@ export default function FlowPage() {
     const syncNodeTitles = () => {
       const currentNodes = nodesRef.current;
       const currentFlow = flowRef.current;
-      
+
       if (currentNodes.length === 0 || !currentFlow) return;
 
       const allNotes = getNotes();
       const noteMap = new Map(allNotes.map(note => [note.id, note.title]));
-      
-      const updatedNodes = currentNodes.map((node) => {
+
+      const updatedNodes = currentNodes.map(node => {
         const noteExists = noteMap.has(node.data.noteId);
         const currentTitle = noteMap.get(node.data.noteId);
         const isDeleted = !noteExists;
-        
+
         // Update label if note exists and title changed
         // Update isDeleted status if it changed
-        if ((currentTitle && currentTitle !== node.data.label) || (node.data.isDeleted !== isDeleted)) {
+        if (
+          (currentTitle && currentTitle !== node.data.label) ||
+          node.data.isDeleted !== isDeleted
+        ) {
           return {
             ...node,
             data: {
@@ -226,15 +277,18 @@ export default function FlowPage() {
 
       const hasChanges = updatedNodes.some((node, idx) => {
         const oldNode = currentNodes[idx];
-        return oldNode && (node.data.label !== oldNode.data.label || node.data.isDeleted !== oldNode.data.isDeleted);
+        return (
+          oldNode &&
+          (node.data.label !== oldNode.data.label || node.data.isDeleted !== oldNode.data.isDeleted)
+        );
       });
-      
+
       if (hasChanges) {
         setNodes(updatedNodes);
         // Update stored flow
         const updatedFlow: Flow = {
           ...currentFlow,
-          nodes: updatedNodes.map((node) => ({
+          nodes: updatedNodes.map(node => ({
             id: node.id,
             noteId: node.data.noteId,
             position: node.position,
@@ -263,7 +317,7 @@ export default function FlowPage() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    
+
     // Also sync periodically (every 3 seconds) when page is visible
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -283,13 +337,13 @@ export default function FlowPage() {
     if (loadedFlow) {
       setFlow(loadedFlow);
       setFlowTitle(loadedFlow.title);
-      
+
       // Sync node labels with current note titles
-      const reactFlowNodes: Node<CustomNodeData>[] = loadedFlow.nodes.map((node) => {
+      const reactFlowNodes: Node<CustomNodeData>[] = loadedFlow.nodes.map(node => {
         const currentNote = getNoteById(node.noteId);
         const isDeleted = !currentNote;
         const currentTitle = currentNote?.title || node.data.label;
-        
+
         return {
           id: node.id,
           position: node.position,
@@ -305,8 +359,8 @@ export default function FlowPage() {
           selected: false,
         };
       });
-      
-      const reactFlowEdges: Edge[] = loadedFlow.edges.map((edge) => ({
+
+      const reactFlowEdges: Edge[] = loadedFlow.edges.map(edge => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
@@ -315,15 +369,17 @@ export default function FlowPage() {
       }));
       setNodes(reactFlowNodes);
       setEdges(reactFlowEdges);
-      
+
       // Update stored flow with synced titles
-      if (loadedFlow.nodes.some((node) => {
-        const currentNote = getNoteById(node.noteId);
-        return currentNote && currentNote.title !== node.data.label;
-      })) {
+      if (
+        loadedFlow.nodes.some(node => {
+          const currentNote = getNoteById(node.noteId);
+          return currentNote && currentNote.title !== node.data.label;
+        })
+      ) {
         const updatedFlow: Flow = {
           ...loadedFlow,
-          nodes: reactFlowNodes.map((node) => ({
+          nodes: reactFlowNodes.map(node => ({
             id: node.id,
             noteId: node.data.noteId,
             position: node.position,
@@ -344,7 +400,7 @@ export default function FlowPage() {
   const saveFlowToStorage = useCallback(() => {
     if (!flow) return;
 
-    const flowNodes: FlowNode[] = nodes.map((node) => ({
+    const flowNodes: FlowNode[] = nodes.map(node => ({
       id: node.id,
       noteId: node.data.noteId,
       position: node.position,
@@ -356,7 +412,7 @@ export default function FlowPage() {
       },
     }));
 
-    const flowEdges: FlowEdge[] = edges.map((edge) => ({
+    const flowEdges: FlowEdge[] = edges.map(edge => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -387,45 +443,51 @@ export default function FlowPage() {
       const newEdge: Edge = {
         ...params,
         id: `edge-${params.source}-${params.target}`,
-        style: { stroke: edgeColors[Math.floor(Math.random() * edgeColors.length)], strokeWidth: 2 },
+        style: {
+          stroke: edgeColors[Math.floor(Math.random() * edgeColors.length)],
+          strokeWidth: 2,
+        },
         animated: true,
       };
-      setEdges((eds) => addEdge(newEdge, eds));
+      setEdges(eds => addEdge(newEdge, eds));
     },
     [setEdges]
   );
 
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    const allNotes = getNotes();
-    // Get note IDs that are already in the flow
-    const existingNoteIds = new Set(nodes.map((n) => n.data.noteId));
-    
-    if (query.trim()) {
-      const filtered = allNotes.filter(
-        (note) =>
-          (note.title.toLowerCase().includes(query.toLowerCase()) ||
-          note.content.toLowerCase().includes(query.toLowerCase())) &&
-          !existingNoteIds.has(note.id)
-      );
-      // Sort by relevance (title matches first)
-      filtered.sort((a, b) => {
-        const aTitleMatch = a.title.toLowerCase().startsWith(query.toLowerCase());
-        const bTitleMatch = b.title.toLowerCase().startsWith(query.toLowerCase());
-        if (aTitleMatch && !bTitleMatch) return -1;
-        if (!aTitleMatch && bTitleMatch) return 1;
-        return a.title.localeCompare(b.title);
-      });
-      setSearchResults(filtered.slice(0, 10)); // Limit to 10 suggestions
-    } else {
-      // Show recent/available notes as suggestions when search is empty
-      const availableNotes = allNotes
-        .filter((note) => !existingNoteIds.has(note.id))
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-        .slice(0, 5);
-      setSearchResults(availableNotes);
-    }
-  }, [nodes]);
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      const allNotes = getNotes();
+      // Get note IDs that are already in the flow
+      const existingNoteIds = new Set(nodes.map(n => n.data.noteId));
+
+      if (query.trim()) {
+        const filtered = allNotes.filter(
+          note =>
+            (note.title.toLowerCase().includes(query.toLowerCase()) ||
+              note.content.toLowerCase().includes(query.toLowerCase())) &&
+            !existingNoteIds.has(note.id)
+        );
+        // Sort by relevance (title matches first)
+        filtered.sort((a, b) => {
+          const aTitleMatch = a.title.toLowerCase().startsWith(query.toLowerCase());
+          const bTitleMatch = b.title.toLowerCase().startsWith(query.toLowerCase());
+          if (aTitleMatch && !bTitleMatch) return -1;
+          if (!aTitleMatch && bTitleMatch) return 1;
+          return a.title.localeCompare(b.title);
+        });
+        setSearchResults(filtered.slice(0, 10)); // Limit to 10 suggestions
+      } else {
+        // Show recent/available notes as suggestions when search is empty
+        const availableNotes = allNotes
+          .filter(note => !existingNoteIds.has(note.id))
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          .slice(0, 5);
+        setSearchResults(availableNotes);
+      }
+    },
+    [nodes]
+  );
 
   useEffect(() => {
     // Load suggestions when search dropdown opens
@@ -439,12 +501,12 @@ export default function FlowPage() {
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      
+
       if (showSearch && searchRef.current && !searchRef.current.contains(target)) {
         setShowSearch(false);
         setSearchQuery('');
       }
-      
+
       if (showEdgeOptions && edgeOptionsRef.current && !edgeOptionsRef.current.contains(target)) {
         setShowEdgeOptions(null);
       }
@@ -458,10 +520,13 @@ export default function FlowPage() {
     };
   }, [showSearch, showEdgeOptions]);
 
-  const handleDeleteEdge = useCallback((edgeId: string) => {
-    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
-    setShowEdgeOptions(null);
-  }, [setEdges]);
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      setEdges(eds => eds.filter(e => e.id !== edgeId));
+      setShowEdgeOptions(null);
+    },
+    [setEdges]
+  );
 
   // Handle Delete/Backspace key to delete selected nodes or edges
   useEffect(() => {
@@ -477,7 +542,7 @@ export default function FlowPage() {
         // Delete selected edges
         if (selectedEdges.length > 0) {
           event.preventDefault();
-          selectedEdges.forEach((edgeId) => {
+          selectedEdges.forEach(edgeId => {
             handleDeleteEdge(edgeId);
           });
           setSelectedEdges([]);
@@ -496,12 +561,12 @@ export default function FlowPage() {
         if (selectedNodes.length > 0) {
           event.preventDefault();
           const currentFlow = flowRef.current;
-          selectedNodes.forEach((nodeId) => {
+          selectedNodes.forEach(nodeId => {
             if (currentFlow) {
               removeNodeFromFlow(currentFlow.id, nodeId);
             }
-            setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-            setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+            setNodes(nds => nds.filter(n => n.id !== nodeId));
+            setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
           });
           setSelectedNodes([]);
           setShowNodeOptions(null);
@@ -535,7 +600,7 @@ export default function FlowPage() {
       type: 'default',
     };
 
-    setNodes((nds) => [...nds, newNode]);
+    setNodes(nds => [...nds, newNode]);
     setSearchQuery('');
     setSearchResults([]);
     setShowSearch(false);
@@ -546,7 +611,7 @@ export default function FlowPage() {
 
     // Create a new note
     const newNote = createNote('Untitled', '');
-    
+
     // Add it to the flow
     handleAddNote(newNote);
   };
@@ -564,14 +629,14 @@ export default function FlowPage() {
     if (flow) {
       removeNodeFromFlow(flow.id, nodeId);
     }
-    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    setNodes(nds => nds.filter(n => n.id !== nodeId));
+    setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
     setShowNodeOptions(null);
   };
 
   const handleChangeNodeColor = (nodeId: string, color: string, closeOptions: boolean = true) => {
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (node.id === nodeId) {
           return {
             ...node,
@@ -588,8 +653,8 @@ export default function FlowPage() {
   };
 
   const handleChangeSelectedNodesColor = (color: string) => {
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (selectedNodes.includes(node.id)) {
           return {
             ...node,
@@ -607,7 +672,7 @@ export default function FlowPage() {
     // Check if click was on the checkbox
     const target = event.target as HTMLElement;
     const isCheckboxClick = target.closest('[data-node-checkbox="true"]') !== null;
-    
+
     if (isCheckboxClick) {
       // Toggle completed status instead of selecting
       event.stopPropagation();
@@ -621,8 +686,8 @@ export default function FlowPage() {
 
     if (event.ctrlKey || event.metaKey) {
       // Multi-select with Ctrl/Cmd
-      setSelectedNodes((prev) =>
-        prev.includes(node.id) ? prev.filter((id) => id !== node.id) : [...prev, node.id]
+      setSelectedNodes(prev =>
+        prev.includes(node.id) ? prev.filter(id => id !== node.id) : [...prev, node.id]
       );
     } else {
       // Single select - select this node
@@ -637,8 +702,8 @@ export default function FlowPage() {
 
     if (event.ctrlKey || event.metaKey) {
       // Multi-select with Ctrl/Cmd
-      setSelectedEdges((prev) =>
-        prev.includes(edge.id) ? prev.filter((id) => id !== edge.id) : [...prev, edge.id]
+      setSelectedEdges(prev =>
+        prev.includes(edge.id) ? prev.filter(id => id !== edge.id) : [...prev, edge.id]
       );
     } else {
       // Single select - select this edge
@@ -647,8 +712,8 @@ export default function FlowPage() {
   };
 
   const handleChangeEdgeColor = (edgeId: string, color: string) => {
-    setEdges((eds) =>
-      eds.map((edge) => {
+    setEdges(eds =>
+      eds.map(edge => {
         if (edge.id === edgeId) {
           return { ...edge, style: { ...edge.style, stroke: color, strokeWidth: 2 } };
         }
@@ -659,8 +724,8 @@ export default function FlowPage() {
   };
 
   const handleChangeSelectedEdgesColor = (color: string) => {
-    setEdges((eds) =>
-      eds.map((edge) => {
+    setEdges(eds =>
+      eds.map(edge => {
         if (selectedEdges.includes(edge.id)) {
           return { ...edge, style: { ...edge.style, stroke: color, strokeWidth: 2 } };
         }
@@ -673,8 +738,8 @@ export default function FlowPage() {
 
   const handleAddTagToNode = (nodeId: string, tag: string) => {
     if (!tag.trim()) return;
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (node.id === nodeId) {
           const existingTags = node.data.tags || [];
           if (!existingTags.includes(tag.trim())) {
@@ -691,14 +756,14 @@ export default function FlowPage() {
   };
 
   const handleRemoveTagFromNode = (nodeId: string, tag: string) => {
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (node.id === nodeId) {
           return {
             ...node,
             data: {
               ...node.data,
-              tags: (node.data.tags || []).filter((t) => t !== tag),
+              tags: (node.data.tags || []).filter(t => t !== tag),
             },
           };
         }
@@ -708,8 +773,8 @@ export default function FlowPage() {
   };
 
   const handleToggleCompleted = (nodeId: string) => {
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (node.id === nodeId) {
           return {
             ...node,
@@ -726,14 +791,14 @@ export default function FlowPage() {
 
   const handleToggleSelectedNodesCompleted = () => {
     // Check if all selected nodes are completed
-    const allCompleted = selectedNodes.every((nodeId) => {
-      const node = nodes.find((n) => n.id === nodeId);
+    const allCompleted = selectedNodes.every(nodeId => {
+      const node = nodes.find(n => n.id === nodeId);
       return node?.data.completed === true;
     });
 
     // Toggle all to the opposite state
-    setNodes((nds) =>
-      nds.map((node) => {
+    setNodes(nds =>
+      nds.map(node => {
         if (selectedNodes.includes(node.id)) {
           return {
             ...node,
@@ -758,26 +823,48 @@ export default function FlowPage() {
     }
   };
 
-  const filteredNodes = selectedTags.length > 0
-    ? nodes.filter((node) => {
-        const nodeTags = node.data.tags || [];
-        return selectedTags.some((tag) => nodeTags.includes(tag));
-      })
-    : nodes;
+  const filteredNodes =
+    selectedTags.length > 0
+      ? nodes.filter(node => {
+          const nodeTags = node.data.tags || [];
+          return selectedTags.some(tag => nodeTags.includes(tag));
+        })
+      : nodes;
 
-  const allTags = Array.from(new Set(nodes.flatMap((node) => node.data.tags || [])));
+  const reactFlowNodes = useMemo(
+    () =>
+      filteredNodes.map(node => ({
+        ...node,
+        type: 'default',
+        selected: selectedNodes.includes(node.id),
+      })),
+    [filteredNodes, selectedNodes]
+  );
+
+  const reactFlowEdges = useMemo(
+    () =>
+      edges.map(edge => ({
+        ...edge,
+        selected: selectedEdges.includes(edge.id),
+      })),
+    [edges, selectedEdges]
+  );
+
+  const allTags = Array.from(new Set(nodes.flatMap(node => node.data.tags || [])));
 
   const selectedNote = selectedNode ? getNoteById(selectedNode.data.noteId) : null;
 
   // Load note content when selectedNode changes
   useEffect(() => {
     if (selectedNode) {
-      getNoteByIdWithContent(selectedNode.data.noteId).then((note) => {
-        setSelectedNoteWithContent(note);
-      }).catch((error) => {
-        logger.error('Error loading note content:', error);
-        setSelectedNoteWithContent(null);
-      });
+      getNoteByIdWithContent(selectedNode.data.noteId)
+        .then(note => {
+          setSelectedNoteWithContent(note);
+        })
+        .catch(error => {
+          logger.error('Error loading note content:', error);
+          setSelectedNoteWithContent(null);
+        });
     } else {
       setSelectedNoteWithContent(null);
     }
@@ -807,7 +894,7 @@ export default function FlowPage() {
   const handleSaveNoteTitle = () => {
     if (!selectedNoteWithContent || !selectedNode || !flow) return;
     if (!isEditingRef.current) return; // Don't save if we're not actually editing
-    
+
     const trimmedTitle = noteTitleValue.trim();
     if (!trimmedTitle) {
       setNoteTitleValue(selectedNoteWithContent.title);
@@ -815,7 +902,7 @@ export default function FlowPage() {
       isEditingRef.current = false;
       return;
     }
-    
+
     if (trimmedTitle !== selectedNoteWithContent.title) {
       // Save to note
       saveNote({
@@ -824,7 +911,7 @@ export default function FlowPage() {
       });
 
       // Update node label in nodes array
-      const updatedNodes = nodes.map((node) =>
+      const updatedNodes = nodes.map(node =>
         node.id === selectedNode.id
           ? { ...node, data: { ...node.data, label: trimmedTitle } }
           : node
@@ -839,7 +926,7 @@ export default function FlowPage() {
       setSelectedNode(updatedSelectedNode);
 
       // Update flow storage immediately to ensure sync
-      const flowNodes: FlowNode[] = updatedNodes.map((node) => ({
+      const flowNodes: FlowNode[] = updatedNodes.map(node => ({
         id: node.id,
         noteId: node.data.noteId,
         position: node.position,
@@ -889,14 +976,14 @@ export default function FlowPage() {
             <input
               type="text"
               value={flowTitle}
-              onChange={(e) => setFlowTitle(e.target.value)}
+              onChange={e => setFlowTitle(e.target.value)}
               onBlur={handleSaveTitle}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   handleSaveTitle();
                 }
               }}
-              className="bg-theme-bg-secondary border border-[#2a3038] rounded-lg px-4 py-2 text-theme-text-primary focus:outline-none focus:border-theme-accent/50 w-full"
+              className="bg-theme-bg-secondary border border-[#2a3038] rounded-lg px-4 py-2 text-theme-text-primary focus:outline-none focus:border-theme-accent/50 w-full focus-visible:!outline-none focus-visible:!ring-0 focus:!outline-none focus:!ring-0"
               autoFocus
             />
           ) : (
@@ -939,7 +1026,7 @@ export default function FlowPage() {
           </button>
           <div className="relative" ref={searchRef}>
             <button
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 setShowSearch(!showSearch);
               }}
@@ -949,9 +1036,9 @@ export default function FlowPage() {
               <span>Search Notes</span>
             </button>
             {showSearch && (
-              <div 
+              <div
                 className="absolute right-0 mt-2 w-96 bg-theme-bg-secondary border border-[#2a3038] rounded-lg shadow-xl z-50 overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               >
                 <div className="p-4 border-b border-[#2a3038] bg-theme-bg-primary">
                   <div className="relative">
@@ -960,7 +1047,7 @@ export default function FlowPage() {
                       type="text"
                       placeholder="Search notes..."
                       value={searchQuery}
-                      onChange={(e) => handleSearch(e.target.value)}
+                      onChange={e => handleSearch(e.target.value)}
                       className="w-full bg-theme-bg-secondary border border-[#2a3038] rounded-lg pl-10 pr-4 py-2.5 text-theme-text-primary placeholder-gray-500 focus:outline-none focus:border-theme-accent transition-colors text-sm"
                       autoFocus
                     />
@@ -974,7 +1061,10 @@ export default function FlowPage() {
                           {searchQuery ? (
                             <>
                               <Search className="w-3 h-3" />
-                              <span>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found</span>
+                              <span>
+                                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}{' '}
+                                found
+                              </span>
                             </>
                           ) : (
                             <>
@@ -985,7 +1075,7 @@ export default function FlowPage() {
                         </div>
                       </div>
                       <div className="p-2">
-                        {searchResults.map((note) => {
+                        {searchResults.map(note => {
                           const formatDate = (dateString: string) => {
                             const date = new Date(dateString);
                             const now = new Date();
@@ -998,9 +1088,12 @@ export default function FlowPage() {
                             if (diffMins < 60) return `${diffMins}m ago`;
                             if (diffHours < 24) return `${diffHours}h ago`;
                             if (diffDays < 7) return `${diffDays}d ago`;
-                            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                            return date.toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: 'short',
+                            });
                           };
-                          
+
                           return (
                             <button
                               key={note.id}
@@ -1012,17 +1105,33 @@ export default function FlowPage() {
                                   <FileText className="w-4 h-4 text-gray-500 group-hover:text-theme-accent transition-colors flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <h4 className="text-sm font-medium text-theme-text-primary group-hover:text-white transition-colors truncate mb-0.5">
-                                      {searchQuery && note.title.toLowerCase().includes(searchQuery.toLowerCase()) ? (
+                                      {searchQuery &&
+                                      note.title
+                                        .toLowerCase()
+                                        .includes(searchQuery.toLowerCase()) ? (
                                         <>
-                                          {note.title.substring(0, note.title.toLowerCase().indexOf(searchQuery.toLowerCase()))}
+                                          {note.title.substring(
+                                            0,
+                                            note.title
+                                              .toLowerCase()
+                                              .indexOf(searchQuery.toLowerCase())
+                                          )}
                                           <span className="bg-theme-accent/20 text-theme-accent px-0.5 rounded">
                                             {note.title.substring(
-                                              note.title.toLowerCase().indexOf(searchQuery.toLowerCase()),
-                                              note.title.toLowerCase().indexOf(searchQuery.toLowerCase()) + searchQuery.length
+                                              note.title
+                                                .toLowerCase()
+                                                .indexOf(searchQuery.toLowerCase()),
+                                              note.title
+                                                .toLowerCase()
+                                                .indexOf(searchQuery.toLowerCase()) +
+                                                searchQuery.length
                                             )}
                                           </span>
                                           {note.title.substring(
-                                            note.title.toLowerCase().indexOf(searchQuery.toLowerCase()) + searchQuery.length
+                                            note.title
+                                              .toLowerCase()
+                                              .indexOf(searchQuery.toLowerCase()) +
+                                              searchQuery.length
                                           )}
                                         </>
                                       ) : (
@@ -1051,7 +1160,9 @@ export default function FlowPage() {
                   ) : (
                     <div className="p-8 text-center">
                       <Search className="w-8 h-8 text-gray-500 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm text-theme-text-secondary mb-1">Start typing to search</p>
+                      <p className="text-sm text-theme-text-secondary mb-1">
+                        Start typing to search
+                      </p>
                       <p className="text-xs text-gray-500">or browse recent notes above</p>
                     </div>
                   )}
@@ -1066,11 +1177,13 @@ export default function FlowPage() {
         <div className="w-64 bg-theme-bg-secondary border-r border-[#2a3038] p-4 overflow-y-auto">
           <div className="mb-6">
             <div className="mb-3">
-              <label className="text-xs font-medium text-theme-text-secondary block leading-tight">Default Node Color</label>
+              <label className="text-xs font-medium text-theme-text-secondary block leading-tight">
+                Default Node Color
+              </label>
               <span className="text-xs text-gray-500">For new nodes</span>
             </div>
             <div className="grid grid-cols-4 gap-2.5">
-              {nodeColors.map((color) => {
+              {nodeColors.map(color => {
                 const isSelected = defaultNodeColor === color;
                 return (
                   <button
@@ -1085,7 +1198,10 @@ export default function FlowPage() {
                     title={color}
                   >
                     {isSelected && (
-                      <Check className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md" strokeWidth={3} />
+                      <Check
+                        className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md"
+                        strokeWidth={3}
+                      />
                     )}
                   </button>
                 );
@@ -1100,7 +1216,8 @@ export default function FlowPage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="text-xs font-medium text-theme-text-secondary">
-                      {selectedNodes.length} {selectedNodes.length === 1 ? 'node' : 'nodes'} selected
+                      {selectedNodes.length} {selectedNodes.length === 1 ? 'node' : 'nodes'}{' '}
+                      selected
                     </div>
                     {selectedNodes.length === 1 && (
                       <span className="text-xs text-gray-500 truncate max-w-[120px]">
@@ -1120,7 +1237,7 @@ export default function FlowPage() {
                 {/* Selected nodes list (if multiple) */}
                 {selectedNodes.length > 1 && selectedNodes.length <= 5 && (
                   <div className="mb-3 space-y-1 max-h-24 overflow-y-auto scrollbar-hide">
-                    {selectedNodes.map((nodeId) => {
+                    {selectedNodes.map(nodeId => {
                       const node = nodes.find(n => n.id === nodeId);
                       if (!node) return null;
                       return (
@@ -1147,7 +1264,7 @@ export default function FlowPage() {
                   <div>
                     <label className="text-xs text-gray-500 mb-2 block">Color</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {nodeColors.map((color) => {
+                      {nodeColors.map(color => {
                         const isSelected = selectedNodes.every(nodeId => {
                           const node = nodes.find(n => n.id === nodeId);
                           return node?.data.color === color;
@@ -1165,7 +1282,10 @@ export default function FlowPage() {
                             title={color}
                           >
                             {isSelected && (
-                              <Check className="w-3 h-3 text-white absolute inset-0 m-auto" strokeWidth={2.5} />
+                              <Check
+                                className="w-3 h-3 text-white absolute inset-0 m-auto"
+                                strokeWidth={2.5}
+                              />
                             )}
                           </button>
                         );
@@ -1175,8 +1295,8 @@ export default function FlowPage() {
 
                   {/* Completed Toggle */}
                   {(() => {
-                    const allCompleted = selectedNodes.every((nodeId) => {
-                      const node = nodes.find((n) => n.id === nodeId);
+                    const allCompleted = selectedNodes.every(nodeId => {
+                      const node = nodes.find(n => n.id === nodeId);
                       return node?.data.completed === true;
                     });
                     return (
@@ -1200,12 +1320,14 @@ export default function FlowPage() {
                   <button
                     onClick={() => {
                       const currentFlow = flowRef.current;
-                      selectedNodes.forEach((nodeId) => {
+                      selectedNodes.forEach(nodeId => {
                         if (currentFlow) {
                           removeNodeFromFlow(currentFlow.id, nodeId);
                         }
-                        setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-                        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+                        setNodes(nds => nds.filter(n => n.id !== nodeId));
+                        setEdges(eds =>
+                          eds.filter(e => e.source !== nodeId && e.target !== nodeId)
+                        );
                       });
                       setSelectedNodes([]);
                       setShowNodeOptions(null);
@@ -1227,7 +1349,8 @@ export default function FlowPage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="text-xs font-medium text-theme-text-secondary">
-                      {selectedEdges.length} {selectedEdges.length === 1 ? 'edge' : 'edges'} selected
+                      {selectedEdges.length} {selectedEdges.length === 1 ? 'edge' : 'edges'}{' '}
+                      selected
                     </div>
                   </div>
                   <button
@@ -1242,11 +1365,11 @@ export default function FlowPage() {
                 {/* Selected edges list (if multiple) */}
                 {selectedEdges.length > 1 && selectedEdges.length <= 5 && (
                   <div className="mb-3 space-y-1 max-h-24 overflow-y-auto scrollbar-hide">
-                    {selectedEdges.map((edgeId) => {
-                      const edge = edges.find((e) => e.id === edgeId);
+                    {selectedEdges.map(edgeId => {
+                      const edge = edges.find(e => e.id === edgeId);
                       if (!edge) return null;
-                      const sourceNode = nodes.find((n) => n.id === edge.source);
-                      const targetNode = nodes.find((n) => n.id === edge.target);
+                      const sourceNode = nodes.find(n => n.id === edge.source);
+                      const targetNode = nodes.find(n => n.id === edge.target);
                       return (
                         <div
                           key={edgeId}
@@ -1271,9 +1394,9 @@ export default function FlowPage() {
                   <div>
                     <label className="text-xs text-gray-500 mb-2 block">Color</label>
                     <div className="grid grid-cols-4 gap-2">
-                      {edgeColors.map((color) => {
-                        const isSelected = selectedEdges.every((edgeId) => {
-                          const edge = edges.find((e) => e.id === edgeId);
+                      {edgeColors.map(color => {
+                        const isSelected = selectedEdges.every(edgeId => {
+                          const edge = edges.find(e => e.id === edgeId);
                           return edge?.style?.stroke === color;
                         });
                         return (
@@ -1289,7 +1412,10 @@ export default function FlowPage() {
                             title={color}
                           >
                             {isSelected && (
-                              <Check className="w-3 h-3 text-white absolute inset-0 m-auto" strokeWidth={2.5} />
+                              <Check
+                                className="w-3 h-3 text-white absolute inset-0 m-auto"
+                                strokeWidth={2.5}
+                              />
                             )}
                           </button>
                         );
@@ -1300,7 +1426,7 @@ export default function FlowPage() {
                   {/* Delete Button */}
                   <button
                     onClick={() => {
-                      selectedEdges.forEach((edgeId) => {
+                      selectedEdges.forEach(edgeId => {
                         handleDeleteEdge(edgeId);
                       });
                       setSelectedEdges([]);
@@ -1319,12 +1445,12 @@ export default function FlowPage() {
           <h3 className="text-sm uppercase tracking-wider text-gray-500 mb-4">Tags</h3>
           {allTags.length > 0 ? (
             <div className="space-y-2">
-              {allTags.map((tag) => (
+              {allTags.map(tag => (
                 <button
                   key={tag}
                   onClick={() => {
-                    setSelectedTags((prev) =>
-                      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                    setSelectedTags(prev =>
+                      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
                     );
                   }}
                   className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
@@ -1353,21 +1479,14 @@ export default function FlowPage() {
         <div className="flex-1 relative">
           <ReactFlowProvider>
             <ReactFlow
-              nodes={filteredNodes.map((node) => ({
-                ...node,
-                type: 'default',
-                selected: selectedNodes.includes(node.id),
-              }))}
-              edges={edges.map((edge) => ({
-                ...edge,
-                selected: selectedEdges.includes(edge.id),
-              }))}
+              nodes={reactFlowNodes}
+              edges={reactFlowEdges}
               nodeTypes={nodeTypes}
-              onNodesChange={(changes) => {
+              onNodesChange={changes => {
                 // Clear selection when nodes are deleted
-                changes.forEach((change) => {
+                changes.forEach(change => {
                   if (change.type === 'remove' && selectedNodes.includes(change.id)) {
-                    setSelectedNodes((prev) => prev.filter((id) => id !== change.id));
+                    setSelectedNodes(prev => prev.filter(id => id !== change.id));
                   }
                 });
                 onNodesChange(changes);
@@ -1402,11 +1521,11 @@ export default function FlowPage() {
               fitView
             >
               <Background color="#4a5560" gap={16} />
-              <Controls 
+              <Controls
                 style={{ backgroundColor: '#3a4450', color: '#9ca3af' } as React.CSSProperties}
               />
-              <MiniMap 
-                nodeColor={(node) => {
+              <MiniMap
+                nodeColor={node => {
                   const nodeData = node.data as unknown as CustomNodeData;
                   return nodeData.color || '#6366F1';
                 }}
@@ -1458,7 +1577,7 @@ export default function FlowPage() {
                     Color
                   </label>
                   <div className="grid grid-cols-4 gap-2.5">
-                    {nodeColors.map((color) => {
+                    {nodeColors.map(color => {
                       const isCurrentColor = showNodeOptions.data.color === color;
                       return (
                         <button
@@ -1473,7 +1592,10 @@ export default function FlowPage() {
                           title={color}
                         >
                           {isCurrentColor && (
-                            <Check className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md" strokeWidth={3} />
+                            <Check
+                              className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md"
+                              strokeWidth={3}
+                            />
                           )}
                         </button>
                       );
@@ -1489,7 +1611,7 @@ export default function FlowPage() {
                   </label>
                   {(showNodeOptions.data.tags || []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-3">
-                      {(showNodeOptions.data.tags || []).map((tag) => (
+                      {(showNodeOptions.data.tags || []).map(tag => (
                         <span
                           key={tag}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-theme-bg-secondary/50 border border-[#2a3038] text-theme-text-primary text-xs rounded-md hover:bg-theme-bg-secondary transition-colors"
@@ -1510,8 +1632,8 @@ export default function FlowPage() {
                     <input
                       type="text"
                       value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => {
+                      onChange={e => setNewTag(e.target.value)}
+                      onKeyDown={e => {
                         if (e.key === 'Enter' && newTag.trim()) {
                           handleAddTagToNode(showNodeOptions.id, newTag);
                         }
@@ -1540,7 +1662,9 @@ export default function FlowPage() {
                         : 'bg-[#2a3038]/30 hover:bg-[#2a3038]/50 border border-[#3a4048] hover:border-theme-accent/50 text-theme-text-secondary hover:text-theme-text-primary'
                     }`}
                   >
-                    <CheckCircle2 className={`w-4 h-4 ${showNodeOptions.data.completed ? '' : 'opacity-50'}`} />
+                    <CheckCircle2
+                      className={`w-4 h-4 ${showNodeOptions.data.completed ? '' : 'opacity-50'}`}
+                    />
                     {showNodeOptions.data.completed ? 'Completed' : 'Mark as Completed'}
                   </button>
                 </div>
@@ -1585,7 +1709,7 @@ export default function FlowPage() {
                     Color
                   </label>
                   <div className="grid grid-cols-4 gap-2.5">
-                    {edgeColors.map((color) => {
+                    {edgeColors.map(color => {
                       const isCurrentColor = showEdgeOptions.style?.stroke === color;
                       return (
                         <button
@@ -1600,7 +1724,10 @@ export default function FlowPage() {
                           title={color}
                         >
                           {isCurrentColor && (
-                            <Check className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md" strokeWidth={3} />
+                            <Check
+                              className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow-md"
+                              strokeWidth={3}
+                            />
                           )}
                         </button>
                       );
@@ -1625,16 +1752,16 @@ export default function FlowPage() {
       </div>
 
       {showPreview && selectedNote && selectedNode && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => {
             setShowPreview(false);
             setSelectedNode(null);
           }}
         >
-          <div 
+          <div
             className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-[#2a3038]"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div className="bg-gradient-to-r from-[#3a4450] to-[#2c3440] px-6 py-5 border-b border-[#2a3038]">
               <div className="flex items-start justify-between gap-4">
@@ -1645,7 +1772,7 @@ export default function FlowPage() {
                         ref={noteTitleInputRef}
                         type="text"
                         value={noteTitleValue}
-                        onChange={(e) => setNoteTitleValue(e.target.value)}
+                        onChange={e => setNoteTitleValue(e.target.value)}
                         onBlur={() => {
                           // Add small delay to prevent immediate blur when clicking to edit
                           setTimeout(() => {
@@ -1654,15 +1781,17 @@ export default function FlowPage() {
                             }
                           }, 200);
                         }}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => {
                           e.stopPropagation();
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             handleSaveNoteTitle();
                           } else if (e.key === 'Escape') {
                             e.preventDefault();
-                            setNoteTitleValue(selectedNoteWithContent?.title || selectedNote?.title || '');
+                            setNoteTitleValue(
+                              selectedNoteWithContent?.title || selectedNote?.title || ''
+                            );
                             setEditingNoteTitle(false);
                           }
                         }}
@@ -1670,9 +1799,9 @@ export default function FlowPage() {
                         autoFocus
                       />
                     ) : (
-                      <h2 
+                      <h2
                         className="text-2xl font-semibold text-gray-100 cursor-text hover:text-theme-text-primary transition-colors"
-                        onMouseDown={(e) => {
+                        onMouseDown={e => {
                           e.preventDefault();
                           e.stopPropagation();
                           isEditingRef.current = true;
@@ -1688,7 +1817,11 @@ export default function FlowPage() {
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {new Date(selectedNoteWithContent?.updated_at || selectedNote?.updated_at || new Date().toISOString()).toLocaleDateString('en-GB', {
+                        {new Date(
+                          selectedNoteWithContent?.updated_at ||
+                            selectedNote?.updated_at ||
+                            new Date().toISOString()
+                        ).toLocaleDateString('en-GB', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
@@ -1701,7 +1834,7 @@ export default function FlowPage() {
                       <div className="flex items-center gap-2">
                         <Tag className="w-4 h-4" />
                         <div className="flex gap-1 flex-wrap">
-                          {selectedNode.data.tags.map((tag) => (
+                          {selectedNode.data.tags.map(tag => (
                             <span
                               key={tag}
                               className="px-2 py-0.5 bg-theme-bg-primary text-theme-text-primary text-xs rounded border border-[#2a3038]"
@@ -1716,7 +1849,12 @@ export default function FlowPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => navigate({ to: '/note/$noteId', params: { noteId: selectedNoteWithContent?.id || selectedNote?.id || '' } })}
+                    onClick={() =>
+                      navigate({
+                        to: '/note/$noteId',
+                        params: { noteId: selectedNoteWithContent?.id || selectedNote?.id || '' },
+                      })
+                    }
                     className="px-4 py-2.5 bg-theme-accent hover:bg-[#4F46E5] text-white rounded-lg transition-colors flex items-center gap-2 font-medium shadow-lg hover:shadow-xl"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -1753,13 +1891,13 @@ export default function FlowPage() {
 
       {/* Help Modal */}
       {showHelp && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setShowHelp(false)}
         >
-          <div 
+          <div
             className="bg-theme-bg-darkest rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-[#2a3038]"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div className="px-6 py-5 border-b border-[#2a3038] bg-theme-bg-darkest">
               <div className="flex items-center justify-between">
@@ -1768,8 +1906,12 @@ export default function FlowPage() {
                     <HelpCircle className="w-5 h-5 text-theme-accent" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-theme-text-primary">Navigation Guide</h2>
-                    <p className="text-xs text-theme-text-secondary mt-0.5">Keyboard shortcuts and interactions</p>
+                    <h2 className="text-lg font-semibold text-theme-text-primary">
+                      Navigation Guide
+                    </h2>
+                    <p className="text-xs text-theme-text-secondary mt-0.5">
+                      Keyboard shortcuts and interactions
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1780,7 +1922,7 @@ export default function FlowPage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6 bg-theme-bg-darkest">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Nodes Section */}
@@ -1796,37 +1938,58 @@ export default function FlowPage() {
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">1</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Click</span> to select</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Click</span> to select
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">2</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Cmd/Ctrl + Click</span> to multi-select</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">
+                          Cmd/Ctrl + Click
+                        </span>{' '}
+                        to multi-select
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">3</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Double-click</span> to preview</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Double-click</span> to
+                        preview
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">4</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Right-click</span> for options</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Right-click</span> for
+                        options
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">5</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Delete/Backspace</span> to remove</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">
+                          Delete/Backspace
+                        </span>{' '}
+                        to remove
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-theme-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-theme-accent/20 transition-colors">
                         <span className="text-theme-accent text-[10px] font-bold">6</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Drag</span> to reposition</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Drag</span> to
+                        reposition
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -1844,31 +2007,49 @@ export default function FlowPage() {
                       <div className="w-5 h-5 rounded-md bg-[#8B5CF6]/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-[#8B5CF6]/20 transition-colors">
                         <span className="text-[#8B5CF6] text-[10px] font-bold">1</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Drag</span> from handle to create</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Drag</span> from
+                        handle to create
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-[#8B5CF6]/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-[#8B5CF6]/20 transition-colors">
                         <span className="text-[#8B5CF6] text-[10px] font-bold">2</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Click</span> to select</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Click</span> to select
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-[#8B5CF6]/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-[#8B5CF6]/20 transition-colors">
                         <span className="text-[#8B5CF6] text-[10px] font-bold">3</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Cmd/Ctrl + Click</span> to multi-select</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">
+                          Cmd/Ctrl + Click
+                        </span>{' '}
+                        to multi-select
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-[#8B5CF6]/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-[#8B5CF6]/20 transition-colors">
                         <span className="text-[#8B5CF6] text-[10px] font-bold">4</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Right-click</span> for options</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Right-click</span> for
+                        options
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-5 h-5 rounded-md bg-[#8B5CF6]/15 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-[#8B5CF6]/20 transition-colors">
                         <span className="text-[#8B5CF6] text-[10px] font-bold">5</span>
                       </div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Delete/Backspace</span> to remove</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">
+                          Delete/Backspace
+                        </span>{' '}
+                        to remove
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -1884,15 +2065,21 @@ export default function FlowPage() {
                   <ul className="space-y-2.5">
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#EC4899] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">Bulk change colors via multi-select</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        Bulk change colors via multi-select
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#EC4899] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">Filter nodes using tags</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        Filter nodes using tags
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#EC4899] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">Set default node color</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        Set default node color
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -1908,15 +2095,23 @@ export default function FlowPage() {
                   <ul className="space-y-2.5">
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">New Node</span> creates note & adds to flow</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">New Node</span>{' '}
+                        creates note & adds to flow
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors"><span className="text-theme-text-primary font-medium">Search Notes</span> to add existing notes</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        <span className="text-theme-text-primary font-medium">Search Notes</span> to
+                        add existing notes
+                      </span>
                     </li>
                     <li className="flex items-start gap-2.5 group">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] flex-shrink-0 mt-1.5"></div>
-                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">Click flow title to rename</span>
+                      <span className="text-sm text-theme-text-secondary group-hover:text-theme-text-primary transition-colors">
+                        Click flow title to rename
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -1928,4 +2123,3 @@ export default function FlowPage() {
     </div>
   );
 }
-

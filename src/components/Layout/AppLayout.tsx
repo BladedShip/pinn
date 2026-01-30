@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
-import { useLocation } from '@tanstack/react-router';
+import { useLocation, Link } from '@tanstack/react-router';
 import { ChevronRight } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -24,19 +24,34 @@ export function AppLayout({ children }: AppLayoutProps) {
     const parts = path.split('/').filter(Boolean);
     const crumbs = [{ label: 'Home', path: '/' }];
 
-    let currentPath = '';
-    parts.forEach((part, index) => {
-      currentPath += `/${part}`;
-      // Basic mapping, could be more sophisticated with route meta
-      let label = part.charAt(0).toUpperCase() + part.slice(1);
-      if (part === 'note' && parts[index+1]) return; // Skip 'note' segment if ID follows
-      if (part === 'flow' && parts[index+1]) return;
-      if (index > 0 && (parts[index-1] === 'note' || parts[index-1] === 'flow')) {
-          label = 'Details'; // Placeholder, ideally we fetch title
+    if (parts.length > 0) {
+      if (parts[0] === 'notes') {
+        crumbs.push({ label: 'Notes', path: '/notes' });
+      } else if (parts[0] === 'flows') {
+        crumbs.push({ label: 'Flows', path: '/flows' });
+      } else if (parts[0] === 'note') {
+        crumbs.push({ label: 'Notes', path: '/notes' });
+        if (parts[1]) {
+          // If we are editing/viewing a note, add it as the leaf
+          crumbs.push({ label: parts[1] === 'new' ? 'New Note' : 'Edit Note', path: path });
+        }
+      } else if (parts[0] === 'flow') {
+        crumbs.push({ label: 'Flows', path: '/flows' });
+        if (parts[1]) {
+          crumbs.push({ label: 'Edit Flow', path: path });
+        }
+      } else {
+        // Fallback generic generator
+        let currentPath = '';
+        parts.forEach(part => {
+          currentPath += `/${part}`;
+          crumbs.push({
+            label: part.charAt(0).toUpperCase() + part.slice(1),
+            path: currentPath,
+          });
+        });
       }
-
-      crumbs.push({ label, path: currentPath });
-    });
+    }
 
     return crumbs;
   };
@@ -54,18 +69,20 @@ export function AppLayout({ children }: AppLayoutProps) {
             {breadcrumbs.map((crumb, index) => (
               <div key={crumb.path} className="flex items-center">
                 {index > 0 && <ChevronRight className="h-4 w-4 mx-1" />}
-                <span className={index === breadcrumbs.length - 1 ? "text-foreground font-medium" : ""}>
-                  {crumb.label}
-                </span>
+                {index === breadcrumbs.length - 1 ? (
+                  <span className="text-foreground font-medium">{crumb.label}</span>
+                ) : (
+                  <Link to={crumb.path} className="hover:text-foreground transition-colors">
+                    {crumb.label}
+                  </Link>
+                )}
               </div>
             ))}
           </nav>
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );
