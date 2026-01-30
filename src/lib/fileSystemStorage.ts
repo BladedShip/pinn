@@ -1164,7 +1164,11 @@ export async function rebuildNotesIndex(): Promise<void> {
           } catch (error) {
             logger.warn(`Error reading file ${entry.name}:`, error);
           }
-        } else if (entry.kind === 'directory' && entry.name !== 'trash' && entry.name !== 'unfiled') {
+        } else if (
+          entry.kind === 'directory' &&
+          entry.name !== 'trash' &&
+          entry.name !== 'unfiled'
+        ) {
           // Skip trash and unfiled directory (unfiled is internal organization, not a user folder)
           const newFolderPath = folderPath ? `${folderPath}/${entry.name}` : entry.name;
           folders.add(newFolderPath);

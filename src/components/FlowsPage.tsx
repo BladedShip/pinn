@@ -595,18 +595,34 @@ export default function FlowsPage() {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="border-theme-border bg-transparent hover:bg-theme-bg-secondary">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="border-theme-border bg-transparent hover:bg-theme-bg-secondary"
+                      >
                         <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-theme-bg-secondary border-theme-border">
-                      <DropdownMenuItem onClick={handleExportAll} className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary">
+                    <DropdownMenuContent
+                      align="end"
+                      className="bg-theme-bg-secondary border-theme-border"
+                    >
+                      <DropdownMenuItem
+                        onClick={handleExportAll}
+                        className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary"
+                      >
                         <Download className="mr-2 h-4 w-4" /> Export All Flows
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleClearAll} className="focus:bg-theme-bg-tertiary focus:text-red-400 text-red-400">
+                      <DropdownMenuItem
+                        onClick={handleClearAll}
+                        className="focus:bg-theme-bg-tertiary focus:text-red-400 text-red-400"
+                      >
                         <Trash2 className="mr-2 h-4 w-4" /> Clear All Flows
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowSettingsDialog(true)} className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary">
+                      <DropdownMenuItem
+                        onClick={() => setShowSettingsDialog(true)}
+                        className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary"
+                      >
                         <Settings className="mr-2 h-4 w-4" /> Settings
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -638,7 +654,9 @@ export default function FlowsPage() {
                       <Card
                         key={flow.id}
                         className="group cursor-pointer hover:shadow-md transition-all border-theme-border bg-theme-bg-secondary hover:border-theme-accent/50"
-                        onClick={() => navigate({ to: '/flow/$flowId', params: { flowId: flow.id } })}
+                        onClick={() =>
+                          navigate({ to: '/flow/$flowId', params: { flowId: flow.id } })
+                        }
                       >
                         <CardHeader className="p-4 pb-2">
                           <div className="flex justify-between items-start gap-2">
@@ -655,7 +673,10 @@ export default function FlowsPage() {
                                   <MoreVertical className="h-3 w-3 text-theme-text-secondary" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-theme-bg-secondary border-theme-border">
+                              <DropdownMenuContent
+                                align="end"
+                                className="bg-theme-bg-secondary border-theme-border"
+                              >
                                 <DropdownMenuItem
                                   className="text-red-400 focus:text-red-400 focus:bg-theme-bg-tertiary"
                                   onClick={e => handleDeleteFlow(flow.id, e)}
@@ -667,17 +688,17 @@ export default function FlowsPage() {
                           </div>
                         </CardHeader>
                         <CardContent className="p-4 pt-2">
-                           <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
-                              <span>
-                                {flow.nodes?.length || 0} node
-                                {(flow.nodes?.length || 0) !== 1 ? 's' : ''}
-                              </span>
-                              <span>
-                                {flow.edges?.length || 0} link
-                                {(flow.edges?.length || 0) !== 1 ? 's' : ''}
-                              </span>
-                           </div>
-                           {flow.tags && flow.tags.length > 0 && (
+                          <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                            <span>
+                              {flow.nodes?.length || 0} node
+                              {(flow.nodes?.length || 0) !== 1 ? 's' : ''}
+                            </span>
+                            <span>
+                              {flow.edges?.length || 0} link
+                              {(flow.edges?.length || 0) !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {flow.tags && flow.tags.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               {flow.tags.slice(0, 3).map(tag => (
                                 <span
@@ -688,10 +709,12 @@ export default function FlowsPage() {
                                 </span>
                               ))}
                               {flow.tags.length > 3 && (
-                                <span className="text-[10px] text-gray-500">+{flow.tags.length - 3}</span>
+                                <span className="text-[10px] text-gray-500">
+                                  +{flow.tags.length - 3}
+                                </span>
                               )}
                             </div>
-                           )}
+                          )}
                         </CardContent>
                         <CardFooter className="p-4 pt-0 text-xs text-muted-foreground flex justify-between items-center">
                           <span className="flex items-center">
@@ -713,29 +736,36 @@ export default function FlowsPage() {
                       <div
                         key={flow.id}
                         className="group flex items-center justify-between p-3 rounded-lg border border-theme-border bg-theme-bg-secondary hover:bg-theme-bg-tertiary transition-colors cursor-pointer"
-                        onClick={() => navigate({ to: '/flow/$flowId', params: { flowId: flow.id } })}
+                        onClick={() =>
+                          navigate({ to: '/flow/$flowId', params: { flowId: flow.id } })
+                        }
                       >
                         <div className="flex-1 min-w-0 grid gap-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold truncate text-theme-text-primary">{flow.title}</h3>
+                            <h3 className="font-semibold truncate text-theme-text-primary">
+                              {flow.title}
+                            </h3>
                             {flow.category && (
-                                <span className="bg-theme-bg-primary px-2 py-0.5 rounded text-[10px] text-muted-foreground border border-theme-border">
-                                  {flow.category}
-                                </span>
-                              )}
+                              <span className="bg-theme-bg-primary px-2 py-0.5 rounded text-[10px] text-muted-foreground border border-theme-border">
+                                {flow.category}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-4 text-xs text-gray-500">
                             <span>{formatDate(flow.updated_at)}</span>
                             <span>{flow.nodes?.length || 0} nodes</span>
                             <span>{flow.edges?.length || 0} links</span>
                             {flow.tags && flow.tags.length > 0 && (
-                                <div className="flex gap-1 ml-2">
+                              <div className="flex gap-1 ml-2">
                                 {flow.tags.slice(0, 3).map(tag => (
-                                    <span key={tag} className="px-1.5 py-0.5 bg-theme-bg-primary rounded text-[10px] border border-theme-border">
+                                  <span
+                                    key={tag}
+                                    className="px-1.5 py-0.5 bg-theme-bg-primary rounded text-[10px] border border-theme-border"
+                                  >
                                     {tag}
-                                    </span>
+                                  </span>
                                 ))}
-                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -749,9 +779,12 @@ export default function FlowsPage() {
                                 {flow.category || 'Unfiled'}
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-theme-bg-secondary border-theme-border max-h-[300px] overflow-y-auto">
+                            <DropdownMenuContent
+                              align="end"
+                              className="bg-theme-bg-secondary border-theme-border max-h-[300px] overflow-y-auto"
+                            >
                               <DropdownMenuItem
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   handleAssignCategory(flow.id, 'Unfiled');
                                 }}
@@ -764,7 +797,7 @@ export default function FlowsPage() {
                                 .map(c => (
                                   <DropdownMenuItem
                                     key={c}
-                                    onClick={(e) => {
+                                    onClick={e => {
                                       e.stopPropagation();
                                       handleAssignCategory(flow.id, c);
                                     }}
@@ -774,7 +807,7 @@ export default function FlowsPage() {
                                   </DropdownMenuItem>
                                 ))}
                               <DropdownMenuItem
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   handleAssignCategory(flow.id, '__new__');
                                 }}

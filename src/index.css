@@ -455,7 +455,9 @@ h6.ce-header {
   color: var(--color-text-tertiary);
   background-color: transparent;
   opacity: 0.6;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
 }
 .ce-toolbar__plus:hover,
 .ce-toolbar__settings-btn:hover {
@@ -514,4 +516,49 @@ h6.ce-header {
 /* Selection color */
 ::selection {
   background-color: rgba(99, 102, 241, 0.3); /* Accent color with opacity */
+}
+
+/* Editor.js Popover Search & Inputs */
+.ce-popover__search,
+.ce-popover input,
+.cdx-search-field {
+  background-color: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 6px !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: none !important;
+}
+
+.ce-popover__nothing-found-message {
+  color: var(--color-text-secondary) !important;
+  font-size: 14px !important;
+}
+
+/* Inline Tool Input (Link) */
+.ce-inline-tool-input {
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* Marker (Highlight) */
+.cdx-marker {
+  background: rgba(99, 102, 241, 0.2) !important; /* Accent color transparent */
+  color: inherit !important;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Popover Scrollbar */
+.ce-popover__items::-webkit-scrollbar {
+  width: 4px;
+}
+.ce-popover__items::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+.ce-popover__items::-webkit-scrollbar-track {
+  background: transparent;
 }

@@ -176,7 +176,9 @@ export default function NotesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const sortedFolders = folders.filter(f => f !== 'All' && f !== 'Unfiled').sort((a, b) => a.localeCompare(b));
+  const sortedFolders = folders
+    .filter(f => f !== 'All' && f !== 'Unfiled')
+    .sort((a, b) => a.localeCompare(b));
 
   const handleCreateFolder = () => {
     const normalized = (newFolderName || '').trim();
@@ -264,35 +266,35 @@ export default function NotesPage() {
 
           {/* Scrollable Folders List */}
           <div
-             className="flex-1 overflow-y-auto px-4 pb-4"
-             style={{
-               scrollbarWidth: 'none',
-               msOverflowStyle: 'none',
-             }}
+            className="flex-1 overflow-y-auto px-4 pb-4"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
           >
-             <div className="space-y-1">
-                {sortedFolders.length === 0 && (
-                  <div className="px-3 pb-2 text-xs text-gray-500">No folders yet</div>
-                )}
-                {sortedFolders.map(folder => (
-                  <button
-                    key={folder}
-                    onClick={() => setSelectedFolder(folder)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      selectedFolder === folder
-                        ? 'bg-theme-bg-secondary text-white'
-                        : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
-                    }`}
-                  >
-                    {selectedFolder === folder ? (
-                      <FolderOpen className="w-4 h-4" />
-                    ) : (
-                      <Folder className="w-4 h-4" />
-                    )}
-                    <span className="flex-1 text-left truncate">{folder}</span>
-                  </button>
-                ))}
-             </div>
+            <div className="space-y-1">
+              {sortedFolders.length === 0 && (
+                <div className="px-3 pb-2 text-xs text-gray-500">No folders yet</div>
+              )}
+              {sortedFolders.map(folder => (
+                <button
+                  key={folder}
+                  onClick={() => setSelectedFolder(folder)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedFolder === folder
+                      ? 'bg-theme-bg-secondary text-white'
+                      : 'text-theme-text-secondary hover:bg-theme-bg-secondary hover:text-theme-text-primary'
+                  }`}
+                >
+                  {selectedFolder === folder ? (
+                    <FolderOpen className="w-4 h-4" />
+                  ) : (
+                    <Folder className="w-4 h-4" />
+                  )}
+                  <span className="flex-1 text-left truncate">{folder}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </aside>
 
@@ -301,75 +303,93 @@ export default function NotesPage() {
           {/* Toolbar */}
           <div className="flex-shrink-0 bg-theme-bg-primary border-b border-theme-border px-6 py-6">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center max-w-7xl mx-auto w-full">
-               <div className="flex items-center gap-2">
-                 <h3 className="text-sm uppercase tracking-wider text-gray-500">
-                    {selectedFolder === 'All' ? 'All Notes' : selectedFolder === 'Unfiled' ? 'Unfiled Notes' : selectedFolder}
-                 </h3>
-                 <span className="text-muted-foreground text-sm">({filteredNotes.length})</span>
-               </div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm uppercase tracking-wider text-gray-500">
+                  {selectedFolder === 'All'
+                    ? 'All Notes'
+                    : selectedFolder === 'Unfiled'
+                      ? 'Unfiled Notes'
+                      : selectedFolder}
+                </h3>
+                <span className="text-muted-foreground text-sm">({filteredNotes.length})</span>
+              </div>
 
-               <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                 <div className="flex items-center border rounded-md bg-background border-theme-border">
-                    <Toggle
-                      pressed={viewMode === 'grid'}
-                      onPressedChange={() => setViewMode('grid')}
-                      className="rounded-r-none border-r border-theme-border text-gray-400 data-[state=on]:bg-theme-bg-secondary data-[state=on]:text-theme-text-primary"
-                      aria-label="Grid view"
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                    </Toggle>
-                    <Toggle
-                      pressed={viewMode === 'list'}
-                      onPressedChange={() => setViewMode('list')}
-                      className="rounded-l-none text-gray-400 data-[state=on]:bg-theme-bg-secondary data-[state=on]:text-theme-text-primary"
-                      aria-label="List view"
-                    >
-                      <ListIcon className="h-4 w-4" />
-                    </Toggle>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowGraphView(true)}
-                      className="rounded-l-none border-l border-theme-border text-gray-400 hover:text-theme-text-primary hover:bg-theme-bg-secondary"
-                      title="Graph View"
-                    >
-                      <Network className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="border-theme-border bg-transparent hover:bg-theme-bg-secondary">
-                        <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-theme-bg-secondary border-theme-border">
-                      <DropdownMenuItem onClick={handleImportClick} className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary">
-                        <Upload className="mr-2 h-4 w-4" /> Import Notes
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportAll} className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary">
-                        <Download className="mr-2 h-4 w-4" /> Export All
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <Button onClick={() => navigate({ to: '/note/new' })}>
-                    <Plus className="mr-2 h-4 w-4" /> New Note
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="flex items-center border rounded-md bg-background border-theme-border">
+                  <Toggle
+                    pressed={viewMode === 'grid'}
+                    onPressedChange={() => setViewMode('grid')}
+                    className="rounded-r-none border-r border-theme-border text-gray-400 data-[state=on]:bg-theme-bg-secondary data-[state=on]:text-theme-text-primary"
+                    aria-label="Grid view"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Toggle>
+                  <Toggle
+                    pressed={viewMode === 'list'}
+                    onPressedChange={() => setViewMode('list')}
+                    className="rounded-l-none text-gray-400 data-[state=on]:bg-theme-bg-secondary data-[state=on]:text-theme-text-primary"
+                    aria-label="List view"
+                  >
+                    <ListIcon className="h-4 w-4" />
+                  </Toggle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowGraphView(true)}
+                    className="rounded-l-none border-l border-theme-border text-gray-400 hover:text-theme-text-primary hover:bg-theme-bg-secondary"
+                    title="Graph View"
+                  >
+                    <Network className="h-4 w-4" />
                   </Button>
-               </div>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="border-theme-border bg-transparent hover:bg-theme-bg-secondary"
+                    >
+                      <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="bg-theme-bg-secondary border-theme-border"
+                  >
+                    <DropdownMenuItem
+                      onClick={handleImportClick}
+                      className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary"
+                    >
+                      <Upload className="mr-2 h-4 w-4" /> Import Notes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleExportAll}
+                      className="focus:bg-theme-bg-tertiary focus:text-theme-text-primary"
+                    >
+                      <Download className="mr-2 h-4 w-4" /> Export All
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button onClick={() => navigate({ to: '/note/new' })}>
+                  <Plus className="mr-2 h-4 w-4" /> New Note
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Content List */}
-          <div className="flex-1 overflow-y-auto px-6 py-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div
+            className="flex-1 overflow-y-auto px-6 py-6"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             <div className="max-w-7xl mx-auto pb-20">
               {loading ? (
                 <div className="py-20 text-center text-muted-foreground">Loading notes...</div>
               ) : filteredNotes.length === 0 ? (
                 <div className="py-20 text-center text-muted-foreground">
-                  {searchQuery
-                    ? 'No notes found matching your search.'
-                    : 'No notes here yet.'}
+                  {searchQuery ? 'No notes found matching your search.' : 'No notes here yet.'}
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -394,7 +414,10 @@ export default function NotesPage() {
                                 <MoreVertical className="h-3 w-3 text-theme-text-secondary" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-theme-bg-secondary border-theme-border">
+                            <DropdownMenuContent
+                              align="end"
+                              className="bg-theme-bg-secondary border-theme-border"
+                            >
                               <DropdownMenuItem
                                 className="text-red-400 focus:text-red-400 focus:bg-theme-bg-tertiary"
                                 onClick={e => handleDeleteClick(e, note.id)}
@@ -434,7 +457,9 @@ export default function NotesPage() {
                     >
                       <div className="flex-1 min-w-0 grid gap-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold truncate text-theme-text-primary">{note.title || 'Untitled'}</h3>
+                          <h3 className="font-semibold truncate text-theme-text-primary">
+                            {note.title || 'Untitled'}
+                          </h3>
                           {note.folder && (
                             <span className="bg-theme-bg-primary px-2 py-0.5 rounded text-[10px] text-muted-foreground border border-theme-border">
                               {note.folder}
@@ -492,9 +517,7 @@ export default function NotesPage() {
           <div className="bg-theme-bg-primary rounded-xl shadow-2xl w-full max-w-md border border-theme-border overflow-hidden">
             <div className="px-6 py-5 border-b border-theme-border">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-light text-theme-text-primary">
-                  New Folder
-                </h2>
+                <h2 className="text-2xl font-light text-theme-text-primary">New Folder</h2>
                 <button
                   onClick={() => {
                     setShowFolderDialog(false);
