@@ -478,6 +478,7 @@ export function getFolderPath(): string | null {
  */
 export async function clearDirectoryHandle(): Promise<void> {
   directoryHandle = null;
+  cachedNotesIndex = null;
   localStorage.removeItem(FOLDER_CONFIGURED_KEY);
   localStorage.removeItem(FOLDER_PATH_KEY);
   await clearHandleFromIndexedDB();
@@ -707,9 +708,28 @@ export async function getExistingSlugsInDirectory(
   return slugs;
 }
 
+export interface NoteIndexEntry {
+  id: string;
+  title: string;
+  folder?: string;
+  filePath: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotesIndex {
+  version: string;
+  lastUpdated: string;
+  notes: NoteIndexEntry[];
+}
+
+// Cache the notes index in memory to prevent race conditions during rapid saves
+let cachedNotesIndex: NotesIndex | null = null;
+
 /**
  * Read notes index from notes-index.json
  */
+
 export async function readNotesIndex(): Promise<{
   version: string;
   lastUpdated: string;
@@ -731,7 +751,9 @@ export async function readNotesIndex(): Promise<{
     if (!text.trim()) {
       return null;
     }
-    return JSON.parse(text);
+    const index = JSON.parse(text);
+    cachedNotesIndex = index;
+    return index;
   } catch (error: any) {
     if (error.name === 'NotFoundError') {
       return null;
@@ -773,6 +795,13 @@ export async function writeNotesIndex(
       notes,
       folders: folders || existingFolders,
     };
+
+    // Update cache immediately to prevent race conditions
+    cachedNotesIndex = indexData;
+
+    const notesDir = await ensureNotesDirectory();
+    const fileHandle = await notesDir.getFileHandle('notes-index.json', { create: true });
+    const writable = await fileHandle.createWritable();
     await writable.write(JSON.stringify(indexData, null, 2));
     await writable.close();
   } catch (error) {
@@ -873,8 +902,11 @@ export async function writeNoteToFile(note: {
       const oldFilename = oldPathParts[oldPathParts.length - 1];
       const oldSlug = oldFilename.replace(/\.md$/, '');
 
+      const existingFolder = existingNote.folder || '';
+      const newFolder = note.folder || '';
+
       // If folder changed, delete old file
-      if (existingNote.folder !== (note.folder || '')) {
+      if (existingFolder !== newFolder) {
         try {
           let oldDirHandle = notesDir;
           if (oldPathParts.length > 1) {
@@ -886,7 +918,7 @@ export async function writeNoteToFile(note: {
           }
           await oldDirHandle.removeEntry(oldFilename, { recursive: false });
           // Remove old slug from existing slugs if it's in the same directory
-          if (existingNote.folder === (note.folder || '')) {
+          if (existingFolder === newFolder) {
             existingSlugs.delete(oldSlug);
           }
         } catch (error: any) {
@@ -902,7 +934,10 @@ export async function writeNoteToFile(note: {
 
     // Check if we can reuse the existing filename
     let filename: string;
-    if (existingNote && existingNote.folder === (note.folder || '')) {
+    const existingFolder = existingNote?.folder || '';
+    const newFolder = note.folder || '';
+
+    if (existingNote && existingFolder === newFolder) {
       // If title hasn't changed (or we are in the same folder and it matches), try to reuse
       // We need to check if the current title still maps to the same slug or if we should force reuse
       // to avoid minor slug variations causing new files.
